@@ -1,3 +1,39 @@
+# Gradle
+.gradle/
+**/build/
+
+# Eclipse/IDE
+*.classpath
+*.project
+.settings/
+
+# IntelliJ
+*.iml
+.idea/
+
+# VS Code
+.vscode/
+
+# Mac
+.DS_Store
+
+# Logs
+logs/
+*.log
+
+# Temporary files
+tmp/
+*.tmp
+
+# Java
+*.class
+*.jar
+*.war
+
+# Environment / secrets
+.env
+
+# Existing entries
 .log/
 .settings/
 .vscode/
