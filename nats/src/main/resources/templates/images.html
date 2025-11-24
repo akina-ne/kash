@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>Images</title>
+</head>
+
+<body>
+  <h1>Images</h1>
+  <div th:if="${#lists.isEmpty(images)}">画像がありません</div>
+  <ul>
+    <li th:each="img : ${images}">
+      <div>
+        <p th:text="${img.fileName}">ファイル名</p>
+        <img th:src="@{/${img.filePath}}" alt="" style="max-width:300px;" />
+      </div>
+    </li>
+  </ul>
+</body>
+
+</html>
