@@ -27,34 +27,31 @@
       opacity: 1;
     }
 
-    /* モーダル内画像とアニメーション（ズームアウト＝縮小） */
+    /* モーダル内画像とアニメーション（拡大から段階的に縮小：ズームアウト） */
     .modal img {
       max-width: 90%;
       max-height: 90%;
-      transition: transform 300ms ease;
-      transform: scale(1);
+      /* transform は JS 側で段階的に変化させるため transition は短めにしておく */
+      transition: transform 120ms linear, opacity 150ms ease;
+      /* 初期はやや拡大した状態にしておき、段階的に縮小（ズームアウト）させる */
+      transform: scale(1.8);
+      opacity: 0;
       box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
       border-radius: 6px;
       background: #fff;
     }
 
-    /* ボタン押下で縮小（ズームアウト） */
-    .modal img.zoomed-out {
-      transform: scale(0.5);
-    }
-
-    /* 小さめの画像サムネイル */
-    .thumbnail {
-      max-width: 300px;
-      display: block;
-      margin-bottom: 8px;
+    /* 表示完了時の状態（最終サイズ） */
+    .modal img.final {
+      transform: scale(1);
+      opacity: 1;
     }
 
     .image-item {
       margin-bottom: 16px;
     }
 
-    .zoom-button {
+    .show-button {
       padding: 6px 10px;
       font-size: 14px;
       cursor: pointer;
@@ -67,36 +64,121 @@
 
 <body>
   <h1>Images</h1>
-  <div th:if="${#lists.isEmpty(images)}">画像がありません</div>
+
+  <!-- クイズ用の2つのボタンだけ表示 -->
+  <div style="margin-bottom:12px;">
+    <button type="button" class="show-button" data-src="/images/onigiri.jpg" data-initial-scale="6"
+      th:attr="data-src=@{/images/onigiri.jpg}" onclick="showZoom(this)">おにぎり（部分拡大）</button>
+    <button type="button" class="show-button" data-src="/images/koppu.png" data-initial-scale="6"
+      th:attr="data-src=@{/images/koppu.png}" onclick="showZoom(this)">コップ（部分拡大）</button>
+  </div>
+
+  <!-- 画像一覧はファイル名のみ表示（表示ボタンは削除） -->
+  <div id="noImagesDiv" th:if="${images == null or #lists.isEmpty(images)}">画像がありません
+    <div style="margin-top:8px;">
+      <!-- 画像リストが空のときもデフォルトで表示ボタンを表示 -->
+      <button id="noImagesDefaultBtn" type="button" class="show-button" th:attr="data-src=@{/images/onigiri.jpg}"
+        onclick="showZoom(this)">表示</button>
+    </div>
+  </div>
   <ul>
     <li th:each="img : ${images}" class="image-item">
       <div>
         <p th:text="${img.fileName}">ファイル名</p>
-        <img th:src="@{/${img.filePath}}" alt="" class="thumbnail" />
-        <!-- 各画像ごとにズームアウト表示ボタンを追加 -->
-        <button type="button" class="zoom-button" th:attr="data-src=@{/${img.filePath}}" onclick="showZoom(this)">ズームアウト表示</button>
       </div>
     </li>
   </ul>
 
   <!-- モーダル（共通） -->
   <div id="imgModal" class="modal" onclick="closeModal(event)">
-    <img id="modalImage" src="" alt="" />
+    <img id="modalImage" src="" alt="画像" />
   </div>
 
   <script>
-    // ボタン要素を受け取り、モーダルを開いて画像を表示し、ズームアウト（縮小）クラスを追加する
+    // アニメーション設定（requestAnimationFrame ベースで滑らかにズームアウトする）
+    var ZOOM_INITIAL = 4.0; // 初期拡大率（表示直後の拡大）。クイズ用途で大きめに設定
+    var ZOOM_DURATION = 5000; // ミリ秒でのアニメーション合計時間（5秒）
+
+    // アニメーションの状態をクリア
+    function clearExistingAnimation(imgEl) {
+      var rafId = imgEl && imgEl.dataset && imgEl.dataset.rafId;
+      if (rafId) {
+        cancelAnimationFrame(Number(rafId));
+        delete imgEl.dataset.rafId;
+      }
+    }
+
+    // イージング関数（ゆっくり止まる感じのイーズアウト）
+    function easeOutCubic(t) {
+      return 1 - Math.pow(1 - t, 3);
+    }
+
+    // ボタン要素を受け取り、モーダルを開いて画像を表示し、滑らかにズームアウトする
     function showZoom(button) {
       var src = button.getAttribute('data-src');
+      // ボタン毎に初期拡大率を指定可能（例: data-initial-scale="6"）
+      var buttonScale = Number(button.getAttribute('data-initial-scale')) || ZOOM_INITIAL;
       var modal = document.getElementById('imgModal');
       var modalImg = document.getElementById('modalImage');
-      modalImg.classList.remove('zoomed-out');
-      modalImg.src = src;
+
+      // 既存のアニメーションがあればキャンセル
+      clearExistingAnimation(modalImg);
+
+      // 初期状態をセット（拡大・透過）
+      modalImg.classList.remove('final');
+      // すべての画像は中央をフォーカスする
+      modalImg.style.transformOrigin = '50% 50%';
+      modalImg.style.transform = 'scale(' + buttonScale + ')';
+      modalImg.style.opacity = 0;
+
+      // onload/onerror を先に登録しておく（キャッシュ時の missed load を防ぐ）
+      modalImg.onload = function () {
+        var start = null;
+        var duration = ZOOM_DURATION;
+        // 表示を即座に行う
+        modalImg.style.opacity = 1;
+
+        function step(timestamp) {
+          if (!start) start = timestamp;
+          var elapsed = timestamp - start;
+          var progress = Math.min(elapsed / duration, 1);
+          // イージングを適用して現在のスケールを算出
+          var eased = easeOutCubic(progress);
+          var currentScale = buttonScale - (buttonScale - 1) * eased;
+          modalImg.style.transform = 'scale(' + currentScale + ')';
+
+          if (progress < 1) {
+            var rafId = requestAnimationFrame(step);
+            modalImg.dataset.rafId = String(rafId);
+          } else {
+            // 完了
+            modalImg.style.transform = 'scale(1)';
+            modalImg.classList.add('final');
+            delete modalImg.dataset.rafId;
+          }
+        }
+
+        // 開始フレームを予約（描画のタイミングを安定させる）
+        var rafId = requestAnimationFrame(step);
+        modalImg.dataset.rafId = String(rafId);
+      };
+
+      modalImg.onerror = function () {
+        modalImg.alt = '画像を読み込めませんでした';
+        modalImg.style.opacity = 1;
+      };
+
       // モーダルを開く
       modal.classList.add('open');
-      // レイアウト反映後に縮小クラスを追加してアニメーションさせる
+
+      // キャッシュ対策: 一旦 src をクリアしてから再設定して onload を確実に発火させる
+      try {
+        modalImg.removeAttribute('src');
+      } catch (e) {
+        modalImg.src = '';
+      }
       requestAnimationFrame(function () {
-        modalImg.classList.add('zoomed-out');
+        modalImg.src = src;
       });
     }
 
@@ -104,16 +186,20 @@
     function closeModal(event) {
       var modal = document.getElementById('imgModal');
       var modalImg = document.getElementById('modalImage');
-      // 画像自体をクリックした場合は閉じない（必要なら閉じるよう変更可）
+      // 画像自体をクリックした場合は閉じない
       if (event && event.target === modalImg) {
         return;
       }
-      modalImg.classList.remove('zoomed-out');
+      // アニメーションが残っていればキャンセル
+      clearExistingAnimation(modalImg);
+      modalImg.classList.remove('final');
       modal.classList.remove('open');
       // 少し遅延して src をクリア
       setTimeout(function () {
         modalImg.src = '';
-      }, 300);
+        modalImg.style.opacity = 0;
+        modalImg.style.transform = '';
+      }, 200);
     }
 
     document.addEventListener('keydown', function (e) {
@@ -124,6 +210,36 @@
         }
       }
     });
+
+    // --- 追加: static/images にファイルがあるかを確認し、存在するなら「画像がありません」メッセージとデフォルトボタンを非表示にする ---
+    (function checkStaticImages() {
+      var candidates = ['/images/onigiri.jpg', '/images/koppu.png'];
+      var found = false;
+      var remaining = candidates.length;
+
+      function hideNoImages() {
+        var d = document.getElementById('noImagesDiv');
+        if (d) d.style.display = 'none';
+      }
+
+      candidates.forEach(function (url) {
+        var img = new Image();
+        img.onload = function () {
+          found = true;
+          hideNoImages();
+        };
+        img.onerror = function () {
+          remaining--;
+          if (remaining === 0 && !found) {
+            // どれも存在しない場合はそのまま表示（何もしない）
+          }
+        };
+        // キャッシュ回避のためタイミング差で設定
+        setTimeout(function () {
+          img.src = url;
+        }, 0);
+      });
+    })();
   </script>
 </body>
 
