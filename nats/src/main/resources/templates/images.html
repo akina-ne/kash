@@ -4,19 +4,127 @@
 <head>
   <meta charset="UTF-8" />
   <title>Images</title>
+  <style>
+    /* モーダルの基本スタイル */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+
+    .modal.open {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    /* モーダル内画像とアニメーション（ズームアウト＝縮小） */
+    .modal img {
+      max-width: 90%;
+      max-height: 90%;
+      transition: transform 300ms ease;
+      transform: scale(1);
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    /* ボタン押下で縮小（ズームアウト） */
+    .modal img.zoomed-out {
+      transform: scale(0.5);
+    }
+
+    /* 小さめの画像サムネイル */
+    .thumbnail {
+      max-width: 300px;
+      display: block;
+      margin-bottom: 8px;
+    }
+
+    .image-item {
+      margin-bottom: 16px;
+    }
+
+    .zoom-button {
+      padding: 6px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      border: 1px solid #666;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+  </style>
 </head>
 
 <body>
   <h1>Images</h1>
   <div th:if="${#lists.isEmpty(images)}">画像がありません</div>
   <ul>
-    <li th:each="img : ${images}">
+    <li th:each="img : ${images}" class="image-item">
       <div>
         <p th:text="${img.fileName}">ファイル名</p>
-        <img th:src="@{/${img.filePath}}" alt="" style="max-width:300px;" />
+        <img th:src="@{/${img.filePath}}" alt="" class="thumbnail" />
+        <!-- 各画像ごとにズームアウト表示ボタンを追加 -->
+        <button type="button" class="zoom-button" th:attr="data-src=@{/${img.filePath}}" onclick="showZoom(this)">ズームアウト表示</button>
       </div>
     </li>
   </ul>
+
+  <!-- モーダル（共通） -->
+  <div id="imgModal" class="modal" onclick="closeModal(event)">
+    <img id="modalImage" src="" alt="" />
+  </div>
+
+  <script>
+    // ボタン要素を受け取り、モーダルを開いて画像を表示し、ズームアウト（縮小）クラスを追加する
+    function showZoom(button) {
+      var src = button.getAttribute('data-src');
+      var modal = document.getElementById('imgModal');
+      var modalImg = document.getElementById('modalImage');
+      modalImg.classList.remove('zoomed-out');
+      modalImg.src = src;
+      // モーダルを開く
+      modal.classList.add('open');
+      // レイアウト反映後に縮小クラスを追加してアニメーションさせる
+      requestAnimationFrame(function () {
+        modalImg.classList.add('zoomed-out');
+      });
+    }
+
+    // モーダルの背景や画像外クリック、ESCで閉じる
+    function closeModal(event) {
+      var modal = document.getElementById('imgModal');
+      var modalImg = document.getElementById('modalImage');
+      // 画像自体をクリックした場合は閉じない（必要なら閉じるよう変更可）
+      if (event && event.target === modalImg) {
+        return;
+      }
+      modalImg.classList.remove('zoomed-out');
+      modal.classList.remove('open');
+      // 少し遅延して src をクリア
+      setTimeout(function () {
+        modalImg.src = '';
+      }, 300);
+    }
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        var modal = document.getElementById('imgModal');
+        if (modal.classList.contains('open')) {
+          closeModal();
+        }
+      }
+    });
+  </script>
 </body>
 
 </html>
