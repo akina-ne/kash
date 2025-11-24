@@ -1,1 +1,48 @@
-hoge
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>入室者一覧</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 1rem;
+    }
+
+    h1 {
+      margin-top: 0;
+    }
+
+    ol {
+      padding-left: 1.4rem;
+    }
+
+    .count {
+      font-weight: bold;
+      margin-bottom: .5rem;
+    }
+  </style>
+</head>
+
+<body>
+  <h1>入室者（入った順）</h1>
+  <div id="count" class="count"></div>
+  <ol id="list"></ol>
+  <p><a href="/logout">Logout</a></p>
+  <script>
+    const render = (users) => {
+      document.getElementById('count').textContent = '参加人数: ' + users.length + '人';
+      document.getElementById('list').innerHTML = users.map((u, i) => `<li>${i + 1}P ${u}</li>`).join('');
+    };
+    const load = async () => {
+      const r = await fetch('/api/online');
+      render(await r.json());
+    };
+    load();
+    setInterval(load, 10000);
+  </script>
+</body>
+
+</html>

@@ -7,6 +7,9 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
+import org.springframework.security.web.session.HttpSessionEventPublisher;
+import team2.nats.security.LoginSuccessHandler;
+import team2.nats.security.LogoutSuccessHandlerImpl;
 
 @Configuration
 public class SecurityConfig {
@@ -18,7 +21,7 @@ public class SecurityConfig {
         .password("{bcrypt}$2y$05$uOIjgUhmJ.17O7z7jjl4YOqIkjw5is0BF7lxhj43j66mfhAeUcVvS")
         .roles("USER").build();
 
-     UserDetails ken = User.withUsername("ken")
+    UserDetails ken = User.withUsername("ken")
         .password("{bcrypt}$2y$05$7z1pcq6GEB9QGHAx/lb/nO7SodBfJWp2uRBAW1zj3SkMDknzRVkoi")
         .roles("USER").build();
 
@@ -38,22 +41,34 @@ public class SecurityConfig {
   }
 
   @Bean
-  public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
-    // 認可設定を明示（permitAll を使用するには authorizeHttpRequests を定義する必要がある）
+  public SecurityFilterChain filterChain(HttpSecurity http,
+      LoginSuccessHandler loginSuccessHandler,
+      LogoutSuccessHandlerImpl logoutSuccessHandler) throws Exception {
     http
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/h2-console/**").permitAll()
+            // index.html と / は認証必須に変更（ログアウト後は /login に誘導）
+            .requestMatchers("/static/**", "/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
+            .requestMatchers("/api/online").authenticated()
             .anyRequest().authenticated())
         .formLogin(login -> login
+            .successHandler(loginSuccessHandler)
             .permitAll())
         .logout(logout -> logout
+            .logoutSuccessHandler(logoutSuccessHandler)
             .logoutUrl("/logout")
-            .logoutSuccessUrl("/") // ログアウト後に / にリダイレクト
-        ).csrf(csrf -> csrf
-            .ignoringRequestMatchers("/h2-console/**")) // sample2用にCSRF対策を無効化
+            .deleteCookies("JSESSIONID")
+            .invalidateHttpSession(true)
+            .permitAll())
+        .csrf(csrf -> csrf
+            .ignoringRequestMatchers("/h2-console/**"))
         .headers(headers -> headers
             .frameOptions(frameOptions -> frameOptions.sameOrigin()));
-
     return http.build();
+  }
+
+  @Bean
+  public HttpSessionEventPublisher httpSessionEventPublisher() {
+    return new HttpSessionEventPublisher();
   }
 }
