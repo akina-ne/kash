@@ -1,0 +1,41 @@
+<!--
+  Thymeleaf テンプレート: メッセージ登録フォーム
+  前提: コントローラで model.addAttribute("message", new Message()) を渡すか、
+        フォーム側で name="content" を使うようコントローラと整合させてください。
+-->
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="ja">
+
+<head>
+  <meta charset="UTF-8" />
+  <title>メッセージ登録</title>
+</head>
+
+<body>
+  <h1>メッセージ登録</h1>
+
+  <!-- コントローラで追加している model attribute 名: messageForm に合わせる -->
+  <form th:action="@{/message/save}" th:object="${messageForm}" method="post">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+    <!-- フラッシュメッセージの表示 -->
+    <div th:if="${error}" style="color: red;">[[${error}]]</div>
+    <div th:if="${saved}" style="color: green;">保存しました。</div>
+
+    <div>
+      <label for="content">本文</label><br />
+      <textarea id="content" th:field="*{content}" rows="6" cols="60" maxlength="1000" required></textarea>
+      <div th:if="${#fields.hasErrors('content')}" th:errors="*{content}" style="color: red;"></div>
+    </div>
+
+    <div style="margin-top:1rem;">
+      <button type="submit">送信</button>
+    </div>
+  </form>
+
+  <p>
+    <a th:href="@{/}">トップへ</a>
+  </p>
+</body>
+
+</html>

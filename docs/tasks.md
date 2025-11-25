@@ -96,3 +96,114 @@ specs.md` に反映されていること
 次にユーザが選べるアクション:
 - 「実装」を指示してください。
 - セキュリティをプロファイルで切り替える実装（例: `application-dev.properties`）を希望する場合はその旨を指示してください。
+
+# 作業計画（テキスト入力をDBに保存する機能）
+
+## 概要
+Webページのテキストボックスに入力した文字列をデータベースに保存する機能を実装するための計画書。調査フェーズの内容（docs/reports/investigate/2025-11-25_テキスト保存調査.md）を踏まえて、最小単位に分割したタスク、関連ファイル、優先順位、DoD を記載する。
+
+## 前提条件
+- 開発段階は組み込み H2 DB を使用する。
+
+## 関連ファイル（読み込み対象）
+- docs/reports/investigate/2025-11-25_テキスト保存調査.md
+- docs/specs.md
+- src/main/java/oit/is/kash/model/Message.java
+- src/main/java/oit/is/kash/repository/MessageRepository.java
+- src/main/java/oit/is/kash/service/MessageService.java
+- src/main/java/oit/is/kash/controller/MessageController.java
+- src/main/resources/templates/messageForm.html
+- src/main/resources/application.properties
+- src/main/resources/schema.sql
+- docs/reports/done/ (完了レポート出力先)
+
+> 注意: 上記 Java パッケージ名はプロジェクトの慣例に合わせて調整すること。
+
+## タスク一覧（優先度順、最小単位）
+
+
+2. スキーマ準備（中）
+   - 目的: messages テーブルを用意する（開発中は spring.jpa.hibernate.ddl-auto=update でも可）。
+   - 関連ファイル:
+     - src/main/resources/schema.sql （任意）
+   - DoD: H2 コンソールで messages テーブルが確認できる。
+
+3. エンティティ作成（高）
+   - 目的: Message エンティティを作成する。
+   - 関連ファイル:
+     - src/main/java/oit/is/kash/model/Message.java
+   - DoD: Message クラスに @Entity, id, content, createdAt が定義されていること。
+
+4. リポジトリ作成（高）
+   - 目的: Message を保存するための JpaRepository を作成する。
+   - 関連ファイル:
+     - src/main/java/oit/is/kash/repository/MessageRepository.java
+   - DoD: MessageRepository が JpaRepository<Message, Long> を継承していること。
+
+
+
+6. コントローラ作成（高）
+   - 目的: フォーム表示（GET）と保存処理（POST）を実装する。
+   - 関連ファイル:
+     - src/main/java/oit/is/kash/controller/MessageController.java
+     - src/main/resources/templates/messageForm.html
+   - DoD: /message/form にアクセスするとフォームが表示され、投稿すると DB にレコードが追加される。
+
+7. テンプレート実装（高）
+   - 目的: Thymeleaf のフォームを作成する（入力欄、送信ボタン、エラーメッセージ）。
+   - 関連ファイル:
+     - src/main/resources/templates/messageForm.html
+   - DoD: フォームから POST でき、バリデーションエラーが表示される。
+
+8. フロントでのバリデーションと XSS 対策（中）
+   - 目的: 必要最小限の入力長チェック、サニタイズの確認。
+   - 関連ファイル:
+     - templates と controller 関連ファイル
+   - DoD: 長すぎるまたは空の入力はバリデーションエラーとなる。
+
+9. テスト（高）
+   - 目的: 単体テスト・統合テストで保存処理を検証する。
+   - 関連ファイル:
+     - src/test/java/.../MessageRepositoryTest.java
+     - src/test/java/.../MessageControllerTest.java
+   - DoD: テストが通ること。
+
+10. ドキュメント更新（必須）
+   - 目的: 実装完了後に完了レポートと specs 更新を行う。
+   - 関連ファイル:
+     - docs/reports/done/done_YYYY-MM-DD_テキスト保存実装.md
+     - docs/specs.md
+   - DoD: 完了レポートが作成され、docs/specs.md に機能が反映されていること。
+
+## 各タスクの詳細手順（省略せず最低限）
+- 環境設定
+  - application.properties に以下を追加（例）: H2 の URL、ユーザ名、パスワード、spring.jpa.hibernate.ddl-auto=update
+  - H2 コンソール有効化を行う（spring.h2.console.enabled=true）
+
+- エンティティ/リポジトリ/コントローラ作成
+  - Message.java に content の長さ制約や @CreationTimestamp 等を付与する。
+  - MessageRepository は基本の save/find を使う。
+  - MessageController の POST は CSRF トークン対応、POST-Redirect-GET パターンを使う。
+
+- テンプレート
+  - Thymeleaf で th:action / th:field を利用し、エスケープは自動で行われることを確認する。
+
+- テスト
+  - H2 を使ったインメモリでのリポジトリテスト、MockMvc を使ったコントローラテストを作成する。
+
+## テスト手順（DoD を満たすための確認手順）
+1. main ブランチ上で作業開始を確認し、新規ブランチを作成する。
+2. gradle bootRun を実行してアプリケーションを起動する。
+3. ブラウザで http://localhost:8080/message/form にアクセスする。
+4. テキストを入力して送信する。
+5. H2 コンソール（http://localhost:8080/h2-console）で messages テーブルに新規レコードが追加されていることを確認する。
+6. 単体テスト・統合テストを実行し、全て通過することを確認する。
+
+## 受け渡し・報告
+- 実装完了時は以下を作成すること:
+  - docs/reports/done/done_YYYY-MM-DD_テキスト保存実装.md （実装手順、確認手順、使用したブランチ名を記載）
+  - docs/specs.md を更新し、UI と API の仕様を反映する。
+
+---
+作成者: GitHub Copilot
+作成日: 2025-11-25
