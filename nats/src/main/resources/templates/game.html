@@ -65,7 +65,24 @@
 <body>
   <h1>Game</h1>
 
-  showZoom(this)
+  <!-- クイズ用の2つのボタンだけ表示 -->
+  <div style="margin-bottom:12px;">
+    <!-- ボタンを非表示にしました -->
+  </div>
+
+  <!-- 画像一覧はファイル名のみ表示（表示ボタンは削除） -->
+  <div id="noImagesDiv" th:if="${images == null or #lists.isEmpty(images)}">画像がありません
+    <div style="margin-top:8px;">
+      <!-- デフォルトの表示ボタンを削除しました -->
+    </div>
+  </div>
+  <ul>
+    <li th:each="img : ${images}" class="image-item">
+      <div>
+        <p th:text="${img.fileName}">ファイル名</p>
+      </div>
+    </li>
+  </ul>
 
   <!-- モーダル（共通） -->
   <div id="imgModal" class="modal" onclick="closeModal(event)">
@@ -74,8 +91,12 @@
 
   <script>
     // アニメーション設定（requestAnimationFrame ベースで滑らかにズームアウトする）
-    var ZOOM_INITIAL = 4.0; // 初期拡大率（表示直後の拡大）。クイズ用途で大きめに設定
-    var ZOOM_DURATION = 5000; // ミリ秒でのアニメーション合計時間（5秒）
+    var ZOOM_INITIAL = 100.0; // 初期拡大率（表示直後の拡大）。クイズ用途で大きめに設定
+    var ZOOM_DURATION = 50000; // ミリ秒でのアニメーション合計時間（50秒）
+
+    // 固定の遷移先URL（ここを目的のURLに変更してください）
+    // shimoさん用に変更
+    var REDIRECT_URL = '/game/ranking';
 
     // アニメーションの状態をクリア
     function clearExistingAnimation(imgEl) {
@@ -133,6 +154,12 @@
             modalImg.style.transform = 'scale(1)';
             modalImg.classList.add('final');
             delete modalImg.dataset.rafId;
+
+            //shimoさん用に追加
+            // アニメーション完了時に常に同じURLへ遷移
+            window.location.href = REDIRECT_URL;
+            // 履歴を残したくない場合は次を使用:
+            // window.location.replace(REDIRECT_URL);
           }
         }
 
@@ -218,6 +245,21 @@
         }, 0);
       });
     })();
+
+    //shimoさん用に追加
+    // ページ読み込み時におにぎり画像で自動起動
+    document.addEventListener('DOMContentLoaded', function () {
+      // showZoom を再利用するための簡易な"仮ボタン"オブジェクトを作成
+      var fakeButton = {
+        getAttribute: function (name) {
+          if (name === 'data-src') return '/images/onigiri.jpg';
+          if (name === 'data-initial-scale') return '6'; // 初期拡大率は必要に応じて調整
+          return null;
+        }
+      };
+      // 自動でモーダルを開いてズームアウト開始
+      showZoom(fakeButton);
+    });
   </script>
 </body>
 

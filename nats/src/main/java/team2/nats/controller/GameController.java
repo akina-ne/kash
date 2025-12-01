@@ -20,4 +20,9 @@ public class GameController {
     model.addAttribute("images", imageRepository.findAll());
     return "game.html";
   }
+
+  @GetMapping("/ranking")
+  public String ranking(ModelMap model) {
+    return "index.html";
+  }
 }
