@@ -1,224 +1,124 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
-
 <head>
   <meta charset="UTF-8" />
   <title>Game</title>
   <style>
-    /* モーダルの基本スタイル */
-    .modal {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: 100%;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      background: rgba(0, 0, 0, 0.7);
-      z-index: 1000;
-      visibility: hidden;
-      opacity: 0;
-      transition: opacity 200ms ease;
-    }
-
-    .modal.open {
-      visibility: visible;
-      opacity: 1;
-    }
-
-    /* モーダル内画像とアニメーション（拡大から段階的に縮小：ズームアウト） */
-    .modal img {
-      max-width: 90%;
-      max-height: 90%;
-      /* transform は JS 側で段階的に変化させるため transition は短めにしておく */
-      transition: transform 120ms linear, opacity 150ms ease;
-      /* 初期はやや拡大した状態にしておき、段階的に縮小（ズームアウト）させる */
-      transform: scale(1.8);
-      opacity: 0;
-      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-      border-radius: 6px;
-      background: #fff;
-    }
-
-    /* 表示完了時の状態（最終サイズ） */
-    .modal img.final {
-      transform: scale(1);
-      opacity: 1;
-    }
-
-    .image-item {
-      margin-bottom: 16px;
-    }
-
-    .show-button {
-      padding: 6px 10px;
-      font-size: 14px;
-      cursor: pointer;
-      border: 1px solid #666;
-      background: #f0f0f0;
-      border-radius: 4px;
-    }
+    .modal { position: fixed; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.7); z-index:1000; visibility:hidden; opacity:0; transition: opacity 200ms ease; }
+    .modal.open { visibility: visible; opacity: 1; }
+    .modal img { max-width:90%; max-height:90%; transition: transform 120ms linear, opacity 150ms ease; transform: scale(1.8); opacity: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border-radius: 6px; background: #fff; }
+    .modal img.final { transform: scale(1); opacity: 1; }
+    .show-button { padding: 6px 10px; font-size: 14px; cursor: pointer; border: 1px solid #666; background: #f0f0f0; border-radius: 4px; }
+    .row { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0; }
+    .card { border:1px solid #ddd; border-radius:6px; padding:8px; width:260px; }
+    .msg { margin:.5rem 0; }
   </style>
 </head>
-
 <body>
   <h1>Game</h1>
 
-  showZoom(this)
+  <div class="msg" th:if="${error}" style="color:red;">[[${error}]]</div>
+  <div class="msg" th:if="${saved}" style="color:green;">保存しました。</div>
 
-  <!-- モーダル（共通） -->
+  <!-- images.html と同じデフォルトボタン -->
+  <div style="margin-bottom:12px;">
+    <button type="button" class="show-button" data-src="/images/onigiri.jpg" data-initial-scale="6"
+      th:attr="data-src=@{/images/onigiri.jpg}" onclick="showZoom(this)">おにぎり（部分拡大）</button>
+    <button type="button" class="show-button" data-src="/images/koppu.png" data-initial-scale="6"
+      th:attr="data-src=@{/images/koppu.png}" onclick="showZoom(this)">コップ（部分拡大）</button>
+  </div>
+
+  <!-- 画像一覧（各画像に「表示」ボタン。img.url は実際のプロパティ名に合わせて変更） -->
+  <div class="row" th:if="${images != null and !#lists.isEmpty(images)}">
+    <div class="card" th:each="img : ${images}">
+      <div><strong th:text="${img.fileName}">ファイル名</strong></div>
+      <button type="button" class="show-button" th:if="${img.url}" th:attr="data-src=${img.url}" onclick="showZoom(this)">表示</button>
+    </div>
+  </div>
+
+  <!-- 回答フォーム -->
+  <form th:action="@{/game/answer}" th:object="${answerForm}" method="post" style="margin-top:16px;">
+    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+    <label for="content">回答</label><br />
+    <textarea id="content" th:field="*{content}" rows="4" cols="60" maxlength="1000" required></textarea>
+    <div style="margin-top:8px;"><button type="submit">送信</button></div>
+  </form>
+
+  <!-- モーダル（images.htmlのJSをそのまま流用） -->
   <div id="imgModal" class="modal" onclick="closeModal(event)">
     <img id="modalImage" src="" alt="画像" />
   </div>
 
   <script>
-    // アニメーション設定（requestAnimationFrame ベースで滑らかにズームアウトする）
-    var ZOOM_INITIAL = 4.0; // 初期拡大率（表示直後の拡大）。クイズ用途で大きめに設定
-    var ZOOM_DURATION = 5000; // ミリ秒でのアニメーション合計時間（5秒）
+    var ZOOM_INITIAL = 100.0; // images.html と同じ
+    var ZOOM_DURATION = 50000; // images.html と同じ
 
-    // アニメーションの状態をクリア
     function clearExistingAnimation(imgEl) {
       var rafId = imgEl && imgEl.dataset && imgEl.dataset.rafId;
-      if (rafId) {
-        cancelAnimationFrame(Number(rafId));
-        delete imgEl.dataset.rafId;
-      }
+      if (rafId) { cancelAnimationFrame(Number(rafId)); delete imgEl.dataset.rafId; }
     }
+    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
-    // イージング関数（ゆっくり止まる感じのイーズアウト）
-    function easeOutCubic(t) {
-      return 1 - Math.pow(1 - t, 3);
-    }
-
-    // ボタン要素を受け取り、モーダルを開いて画像を表示し、滑らかにズームアウトする
     function showZoom(button) {
       var src = button.getAttribute('data-src');
-      // ボタン毎に初期拡大率を指定可能（例: data-initial-scale="6"）
       var buttonScale = Number(button.getAttribute('data-initial-scale')) || ZOOM_INITIAL;
       var modal = document.getElementById('imgModal');
       var modalImg = document.getElementById('modalImage');
 
-      // 既存のアニメーションがあればキャンセル
       clearExistingAnimation(modalImg);
-
-      // 初期状態をセット（拡大・透過）
       modalImg.classList.remove('final');
-      // すべての画像は中央をフォーカスする
       modalImg.style.transformOrigin = '50% 50%';
       modalImg.style.transform = 'scale(' + buttonScale + ')';
       modalImg.style.opacity = 0;
 
-      // onload/onerror を先に登録しておく（キャッシュ時の missed load を防ぐ）
       modalImg.onload = function () {
         var start = null;
         var duration = ZOOM_DURATION;
-        // 表示を即座に行う
         modalImg.style.opacity = 1;
 
         function step(timestamp) {
           if (!start) start = timestamp;
           var elapsed = timestamp - start;
           var progress = Math.min(elapsed / duration, 1);
-          // イージングを適用して現在のスケールを算出
           var eased = easeOutCubic(progress);
           var currentScale = buttonScale - (buttonScale - 1) * eased;
           modalImg.style.transform = 'scale(' + currentScale + ')';
-
           if (progress < 1) {
             var rafId = requestAnimationFrame(step);
             modalImg.dataset.rafId = String(rafId);
           } else {
-            // 完了
             modalImg.style.transform = 'scale(1)';
             modalImg.classList.add('final');
             delete modalImg.dataset.rafId;
           }
         }
-
-        // 開始フレームを予約（描画のタイミングを安定させる）
         var rafId = requestAnimationFrame(step);
         modalImg.dataset.rafId = String(rafId);
       };
 
-      modalImg.onerror = function () {
-        modalImg.alt = '画像を読み込めませんでした';
-        modalImg.style.opacity = 1;
-      };
+      modalImg.onerror = function () { modalImg.alt = '画像を読み込めませんでした'; modalImg.style.opacity = 1; };
 
-      // モーダルを開く
       modal.classList.add('open');
-
-      // キャッシュ対策: 一旦 src をクリアしてから再設定して onload を確実に発火させる
-      try {
-        modalImg.removeAttribute('src');
-      } catch (e) {
-        modalImg.src = '';
-      }
-      requestAnimationFrame(function () {
-        modalImg.src = src;
-      });
+      try { modalImg.removeAttribute('src'); } catch (e) { modalImg.src = ''; }
+      requestAnimationFrame(function () { modalImg.src = src; });
     }
 
-    // モーダルの背景や画像外クリック、ESCで閉じる
     function closeModal(event) {
       var modal = document.getElementById('imgModal');
       var modalImg = document.getElementById('modalImage');
-      // 画像自体をクリックした場合は閉じない
-      if (event && event.target === modalImg) {
-        return;
-      }
-      // アニメーションが残っていればキャンセル
+      if (event && event.target === modalImg) return;
       clearExistingAnimation(modalImg);
       modalImg.classList.remove('final');
       modal.classList.remove('open');
-      // 少し遅延して src をクリア
-      setTimeout(function () {
-        modalImg.src = '';
-        modalImg.style.opacity = 0;
-        modalImg.style.transform = '';
-      }, 200);
+      setTimeout(function () { modalImg.src = ''; modalImg.style.opacity = 0; modalImg.style.transform = ''; }, 200);
     }
 
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         var modal = document.getElementById('imgModal');
-        if (modal.classList.contains('open')) {
-          closeModal();
-        }
+        if (modal.classList.contains('open')) closeModal();
       }
     });
-
-    // --- 追加: static/images にファイルがあるかを確認し、存在するなら「画像がありません」メッセージとデフォルトボタンを非表示にする ---
-    (function checkStaticImages() {
-      var candidates = ['/images/onigiri.jpg', '/images/koppu.png'];
-      var found = false;
-      var remaining = candidates.length;
-
-      function hideNoImages() {
-        var d = document.getElementById('noImagesDiv');
-        if (d) d.style.display = 'none';
-      }
-
-      candidates.forEach(function (url) {
-        var img = new Image();
-        img.onload = function () {
-          found = true;
-          hideNoImages();
-        };
-        img.onerror = function () {
-          remaining--;
-          if (remaining === 0 && !found) {
-            // どれも存在しない場合はそのまま表示（何もしない）
-          }
-        };
-        // キャッシュ回避のためタイミング差で設定
-        setTimeout(function () {
-          img.src = url;
-        }, 0);
-      });
-    })();
   </script>
 </body>
-
 </html>
