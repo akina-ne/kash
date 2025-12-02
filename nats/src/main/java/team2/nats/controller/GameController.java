@@ -56,9 +56,4 @@ public class GameController {
       this.content = content;
     }
   }
-
-  @GetMapping("/ranking")
-  public String ranking(ModelMap model) {
-    return "index.html";
-  }
 }

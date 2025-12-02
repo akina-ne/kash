@@ -1,19 +1,76 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
   <meta charset="UTF-8" />
   <title>Game</title>
   <style>
-    .modal { position: fixed; top:0; left:0; width:100%; height:100%; display:flex; align-items:center; justify-content:center; background: rgba(0,0,0,0.7); z-index:1000; visibility:hidden; opacity:0; transition: opacity 200ms ease; }
-    .modal.open { visibility: visible; opacity: 1; }
-    .modal img { max-width:90%; max-height:90%; transition: transform 120ms linear, opacity 150ms ease; transform: scale(1.8); opacity: 0; box-shadow: 0 8px 24px rgba(0,0,0,0.5); border-radius: 6px; background: #fff; }
-    .modal img.final { transform: scale(1); opacity: 1; }
-    .show-button { padding: 6px 10px; font-size: 14px; cursor: pointer; border: 1px solid #666; background: #f0f0f0; border-radius: 4px; }
-    .row { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0; }
-    .card { border:1px solid #ddd; border-radius:6px; padding:8px; width:260px; }
-    .msg { margin:.5rem 0; }
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: rgba(0, 0, 0, 0.7);
+      z-index: 1000;
+      visibility: hidden;
+      opacity: 0;
+      transition: opacity 200ms ease;
+    }
+
+    .modal.open {
+      visibility: visible;
+      opacity: 1;
+    }
+
+    .modal img {
+      max-width: 90%;
+      max-height: 90%;
+      transition: transform 120ms linear, opacity 150ms ease;
+      transform: scale(1.8);
+      opacity: 0;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+      border-radius: 6px;
+      background: #fff;
+    }
+
+    .modal img.final {
+      transform: scale(1);
+      opacity: 1;
+    }
+
+    .show-button {
+      padding: 6px 10px;
+      font-size: 14px;
+      cursor: pointer;
+      border: 1px solid #666;
+      background: #f0f0f0;
+      border-radius: 4px;
+    }
+
+    .row {
+      display: flex;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin: 12px 0;
+    }
+
+    .card {
+      border: 1px solid #ddd;
+      border-radius: 6px;
+      padding: 8px;
+      width: 260px;
+    }
+
+    .msg {
+      margin: .5rem 0;
+    }
   </style>
 </head>
+
 <body>
   <h1>Game</h1>
 
@@ -32,7 +89,8 @@
   <div class="row" th:if="${images != null and !#lists.isEmpty(images)}">
     <div class="card" th:each="img : ${images}">
       <div><strong th:text="${img.fileName}">ファイル名</strong></div>
-      <button type="button" class="show-button" th:if="${img.url}" th:attr="data-src=${img.url}" onclick="showZoom(this)">表示</button>
+      <button type="button" class="show-button" th:if="${img.url}" th:attr="data-src=${img.url}"
+        onclick="showZoom(this)">表示</button>
     </div>
   </div>
 
@@ -53,7 +111,7 @@
 
     var ZOOM_INITIAL = 100.0; // images.html と同じ
     var ZOOM_DURATION = 50000; // images.html と同じ
-    var REDIRECT_URL = '/game/ranking';
+    var REDIRECT_URL = '/ranking';
 
     function clearExistingAnimation(imgEl) {
       var rafId = imgEl && imgEl.dataset && imgEl.dataset.rafId;
@@ -176,4 +234,5 @@
 
   </script>
 </body>
+
 </html>
