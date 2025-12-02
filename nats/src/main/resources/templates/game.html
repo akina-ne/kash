@@ -81,8 +81,8 @@
   <div style="margin-bottom:12px;">
     <button type="button" class="show-button" data-src="/images/onigiri.jpg" data-initial-scale="6"
       th:attr="data-src=@{/images/onigiri.jpg}" onclick="showZoom(this)">おにぎり（部分拡大）</button>
-    <button type="button" class="show-button" data-src="/images/koppu.png" data-initial-scale="6"
-      th:attr="data-src=@{/images/koppu.png}" onclick="showZoom(this)">コップ（部分拡大）</button>
+    <button type="button" class="show-button" data-src="/images/kinkakuji.jpg" data-initial-scale="6"
+      th:attr="data-src=@{/images/kinkakuji.jpg}" onclick="showZoom(this)">コップ（部分拡大）</button>
   </div>
 
   <!-- 画像一覧（各画像に「表示」ボタン。img.url は実際のプロパティ名に合わせて変更） -->
@@ -189,7 +189,7 @@
 
     // --- 追加: static/images にファイルがあるかを確認し、存在するなら「画像がありません」メッセージとデフォルトボタンを非表示にする ---
     (function checkStaticImages() {
-      var candidates = ['/images/onigiri.jpg', '/images/koppu.png'];
+      var candidates = ['/images/onigiri.jpg', '/images/kinkakuji.jpg'];
       var found = false;
       var remaining = candidates.length;
 
