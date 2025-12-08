@@ -120,7 +120,7 @@
   </style>
 </head>
 
-<body>
+<body th:attr="data-initial-image=${initialImage}">
   <h1>Game</h1>
 
   <div class="msg" th:if="${error}" style="color:red;">[[${error}]]</div>
@@ -150,7 +150,7 @@
       <div class="row" th:if="${images != null and !#lists.isEmpty(images)}" style="margin-top:16px;">
         <div class="card" th:each="img : ${images}">
           <div><strong th:text="${img.fileName}">ファイル名</strong></div>
-          <button type="button" class="show-button" th:if="${img.url}" th:attr="data-src=${img.url}"
+          <button type="button" class="show-button" th:if="${img.filePath}" th:attr="data-src=${img.filePath}"
             onclick="showZoom(this)">表示</button>
         </div>
       </div>
@@ -165,8 +165,8 @@
   </div>
 
   <script>
-    var ZOOM_INITIAL = 100.0; // images.html と同じ
-    var ZOOM_DURATION = 50000; // images.html と同じ
+    var ZOOM_INITIAL = 1.0; // images.html と同じ
+    var ZOOM_DURATION = 30000; // images.html と同じ
     var REDIRECT_URL = '/ranking';
 
     function clearExistingAnimation(imgEl) {
@@ -272,13 +272,14 @@
     })();
 
     //shimoさん用に追加
-    // ページ読み込み時におにぎり画像で自動起動
+    // ページ読み込み時におにぎり画像で自動起動（サーバ側で選ばれた画像を使う）
     document.addEventListener('DOMContentLoaded', function () {
-      // showZoom を再利用するための簡易な"仮ボタン"オブジェクトを作成
+      var initial = document.body && document.body.dataset && document.body.dataset.initialImage;
+      var imgSrc = initial || '/images/onigiri.jpg';
       var fakeButton = {
         getAttribute: function (name) {
-          if (name === 'data-src') return '/images/onigiri.jpg';
-          if (name === 'data-initial-scale') return '6'; // 初期拡大率は必要に応じて調整
+          if (name === 'data-src') return imgSrc;
+          if (name === 'data-initial-scale') return '10';
           return null;
         }
       };
