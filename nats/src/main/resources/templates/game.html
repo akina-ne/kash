@@ -124,6 +124,7 @@
   <h1>Game</h1>
 
   <div class="msg" th:if="${error}" style="color:red;">[[${error}]]</div>
+  <div class="msg" th:if="${resultMsg}" style="color:blue;">[[${resultMsg}]]</div>
   <div class="msg" th:if="${saved}" style="color:green;">保存しました。</div>
 
   <!-- images.html と同じデフォルトボタン -->
@@ -140,20 +141,19 @@
     <div class="form-area">
       <form th:action="@{/game/answer}" th:object="${answerForm}" method="post" style="margin-top:0;">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+
+        <!-- ★ 出題中の画像IDを AnswerForm.imageId に渡す -->
+        <input type="hidden" th:field="*{imageId}" th:value="${questionImage != null} ? ${questionImage.id} : ''" />
+
         <h2>回答フォーム</h2>
-        <label for="content">回答</label><br />
+        <!-- ★ ラベルをローマ字前提に変更 -->
+        <label for="content">回答（ローマ字で入力してください）</label><br />
         <textarea id="content" th:field="*{content}" rows="12" cols="40" maxlength="1000" required></textarea>
         <div style="margin-top:8px;"><button type="submit">送信</button></div>
       </form>
 
       <!-- 画像一覧はフォーム下に表示（必要に応じて移動可能） -->
-      <div class="row" th:if="${images != null and !#lists.isEmpty(images)}" style="margin-top:16px;">
-        <div class="card" th:each="img : ${images}">
-          <div><strong th:text="${img.fileName}">ファイル名</strong></div>
-          <button type="button" class="show-button" th:if="${img.url}" th:attr="data-src=${img.url}"
-            onclick="showZoom(this)">表示</button>
-        </div>
-      </div>
+
     </div>
 
     <!-- 右: 画像スペース（50%） -->
