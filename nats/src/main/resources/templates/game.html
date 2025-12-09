@@ -127,14 +127,6 @@
   <div class="msg" th:if="${resultMsg}" style="color:blue;">[[${resultMsg}]]</div>
   <div class="msg" th:if="${saved}" style="color:green;">保存しました。</div>
 
-  <!-- images.html と同じデフォルトボタン -->
-  <div style="margin-bottom:12px;">
-    <button type="button" class="show-button" data-src="/images/onigiri.jpg" data-initial-scale="6"
-      th:attr="data-src=@{/images/onigiri.jpg}" onclick="showZoom(this)">おにぎり（部分拡大）</button>
-    <button type="button" class="show-button" data-src="/images/kinkakuji.jpg" data-initial-scale="6"
-      th:attr="data-src=@{/images/kinkakuji.jpg}" onclick="showZoom(this)">コップ（部分拡大）</button>
-  </div>
-
   <!-- レイアウト: 左に画像ズーム、右にフォーム -->
   <div class="layout">
     <!-- 左: 回答フォーム（50%） -->
