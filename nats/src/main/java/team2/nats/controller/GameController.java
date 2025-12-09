@@ -1,13 +1,17 @@
 // filepath: c:\Users\kenke\oithomes\isdev\kadai\isdev25\kash\nats\src\main\java\team2\nats\controller\GameController.java
 package team2.nats.controller;
 
+import java.util.concurrent.ThreadLocalRandom;
+
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+
 import team2.nats.entity.Image;
 import team2.nats.repository.ImageRepository;
 import team2.nats.service.MessageService;
+import java.util.List;
 
 import java.util.Optional;
 
@@ -25,6 +29,26 @@ public class GameController {
   /** ゲーム画面表示（おにぎり固定・id=1 を出題） */
   @GetMapping("/game")
   public String game(Model model) {
+    List<Image> imgs = imageRepository.findAll();
+    model.addAttribute("images", imgs);
+    if (!model.containsAttribute("answerForm")) {
+      model.addAttribute("answerForm", new AnswerForm());
+    }
+    // 追加: ランダムに初期表示画像を選んでテンプレートに渡す
+    String initialImage = null;
+    if (imgs != null && !imgs.isEmpty()) {
+      Image pick = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
+      // filePath があればそれを使い、なければ /images/{fileName} を作る
+      if (pick.getFilePath() != null && !pick.getFilePath().isBlank()) {
+        initialImage = pick.getFilePath().startsWith("/") ? pick.getFilePath() : "/" + pick.getFilePath();
+      } else {
+        initialImage = "/images/" + pick.getFileName();
+      }
+    } else {
+      // 画像がなければ既存のデフォルトを使う
+      initialImage = "/images/onigiri.jpg";
+    }
+    model.addAttribute("initialImage", initialImage);
 
     // id=1 の画像を出題用として取得（おにぎり前提）
     Optional<Image> opt = imageRepository.findById(1L);
