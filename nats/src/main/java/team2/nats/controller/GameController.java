@@ -69,7 +69,7 @@ public class GameController {
 
     // 入力チェック
     if (content == null || content.trim().isEmpty()) {
-      ra.addFlashAttribute("error", "回答を入力してください（ローマ字）");
+      ra.addFlashAttribute("error", "回答を入力してください（ひらがな）");
       ra.addFlashAttribute("answerForm", form);
       return "redirect:/game";
     }
@@ -79,8 +79,15 @@ public class GameController {
       return "redirect:/game";
     }
 
-    // 前後の空白を削除し、小文字にそろえる
-    String normalized = content.trim().toLowerCase();
+    // 前後の空白を削除
+    String normalized = content.trim();
+
+    // ★ ひらがなのみ許可
+    if (!isHiraganaOnly(normalized)) {
+      ra.addFlashAttribute("error", "ひらがなのみで入力してください");
+      ra.addFlashAttribute("answerForm", form);
+      return "redirect:/game";
+    }
 
     // どの画像への回答か（hidden imageId）※null の場合は 1 を見る
     Long imageId = form.getImageId();
@@ -96,7 +103,7 @@ public class GameController {
     }
 
     Image image = imageOpt.get();
-    String answerKana = image.getAnswerKana(); // ここにはローマ字（例: "onigiri"）が入る
+    String answerKana = image.getAnswerKana(); // ここにはひらがなが入る
 
     if (answerKana == null || answerKana.isBlank()) {
       ra.addFlashAttribute("error", "この画像の正解が未設定です");
@@ -104,11 +111,8 @@ public class GameController {
       return "redirect:/game";
     }
 
-    // 正解文字列も小文字にそろえる
-    String expected = answerKana.trim().toLowerCase();
-
-    // ★ ローマ字で完全一致判定
-    boolean correct = normalized.equals(expected);
+    // ★ ひらがなで完全一致判定
+    boolean correct = normalized.equals(answerKana.trim());
 
     // 入力内容はこれまで通り保存
     messageService.saveMessage(content);
@@ -122,6 +126,19 @@ public class GameController {
     ra.addFlashAttribute("answerForm", form);
     ra.addFlashAttribute("saved", true);
     return "redirect:/game";
+  }
+
+
+  private boolean isHiraganaOnly(String s) {
+    if (s == null || s.isEmpty())
+      return false;
+    for (int i = 0; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (c < 'ぁ' || c > 'ん') {
+        return false;
+      }
+    }
+    return true;
   }
 
   /** フォーム用のインナークラス */
