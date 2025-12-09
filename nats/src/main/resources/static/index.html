@@ -26,7 +26,7 @@
 
     /* 追加: 表示ボタンのスタイル */
     .show-images-button {
-      display: inline-block;
+      display: none;
       margin: 0.5rem 0 1rem 0;
       padding: 8px 12px;
       background: #2d7cff;
@@ -47,20 +47,35 @@
   <ol id="list"></ol>
   <p><a href="/logout">Logout</a></p>
   <script>
-    const render = (users) => {
+    const render = (data) => {
+      // /api/online から { users: [...], currentUser: "..." } が返る想定
+      const users = data.users || [];
+      const currentUser = data.currentUser;
+
       document.getElementById('count').textContent = '参加人数: ' + users.length + '人';
-      document.getElementById('list').innerHTML = users.map((u, i) => `<li>${i + 1}P ${u}</li>`).join('');
+      document.getElementById('list').innerHTML =
+        users.map((u, i) => `<li>${i + 1}P ${u}</li>`).join('');
+
+      const openBtn = document.getElementById('openImagesBtn');
+
+      // 1プレイヤー: users[0] と現在ログインユーザーが一致する場合だけ表示
+      if (users.length > 0 && currentUser && users[0] === currentUser) {
+        openBtn.style.display = 'inline-block';
+      } else {
+        openBtn.style.display = 'none';
+      }
     };
+
     const load = async () => {
       const r = await fetch('/api/online');
-      render(await r.json());
+      const data = await r.json();
+      render(data);
     };
     load();
     setInterval(load, 10000);
 
-    // ボタンのクリックで /images ページを開く
+    // ボタンのクリックで /game ページを開く
     document.getElementById('openImagesBtn').addEventListener('click', function () {
-      // 同じタブで遷移
       window.location.href = '/game';
     });
   </script>
