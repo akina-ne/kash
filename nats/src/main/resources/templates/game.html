@@ -144,14 +144,6 @@
         <div style="margin-top:8px;"><button type="submit">送信</button></div>
       </form>
 
-      <!-- 画像一覧はフォーム下に表示（必要に応じて移動可能） -->
-      <div class="row" th:if="${images != null and !#lists.isEmpty(images)}" style="margin-top:16px;">
-        <div class="card" th:each="img : ${images}">
-          <div><strong th:text="${img.fileName}">ファイル名</strong></div>
-          <button type="button" class="show-button" th:if="${img.filePath}" th:attr="data-src=${img.filePath}"
-            onclick="showZoom(this)">表示</button>
-        </div>
-      </div>
     </div>
 
     <!-- 右: 画像スペース（50%） -->
