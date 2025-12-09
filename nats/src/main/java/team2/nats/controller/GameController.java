@@ -31,14 +31,13 @@ public class GameController {
   public String game(Model model) {
     List<Image> imgs = imageRepository.findAll();
     model.addAttribute("images", imgs);
-    if (!model.containsAttribute("answerForm")) {
-      model.addAttribute("answerForm", new AnswerForm());
-    }
+
     // 追加: ランダムに初期表示画像を選んでテンプレートに渡す
     String initialImage = null;
     if (imgs != null && !imgs.isEmpty()) {
       Image pick = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
       // filePath があればそれを使い、なければ /images/{fileName} を作る
+      model.addAttribute("questionImage", pick);
       if (pick.getFilePath() != null && !pick.getFilePath().isBlank()) {
         initialImage = pick.getFilePath().startsWith("/") ? pick.getFilePath() : "/" + pick.getFilePath();
       } else {
@@ -47,12 +46,9 @@ public class GameController {
     } else {
       // 画像がなければ既存のデフォルトを使う
       initialImage = "/images/onigiri.jpg";
+      model.addAttribute("questionImage", imageRepository.findById(1L));
     }
     model.addAttribute("initialImage", initialImage);
-
-    // id=1 の画像を出題用として取得（おにぎり前提）
-    Optional<Image> opt = imageRepository.findById(1L);
-    opt.ifPresent(img -> model.addAttribute("questionImage", img));
 
     // フォームオブジェクト
     if (!model.containsAttribute("answerForm")) {
@@ -89,10 +85,13 @@ public class GameController {
       return "redirect:/game";
     }
 
-    // どの画像への回答か（hidden imageId）※null の場合は 1 を見る
+    // どの画像への回答か（hidden imageId）
     Long imageId = form.getImageId();
     if (imageId == null) {
-      imageId = 1L; // おにぎり固定
+      // ★ ここでエラーにせず、メッセージを出して戻す
+      ra.addFlashAttribute("error", "画像情報が取得できませんでした。もう一度お試しください。");
+      ra.addFlashAttribute("answerForm", form);
+      return "redirect:/game";
     }
 
     Optional<Image> imageOpt = imageRepository.findById(imageId);
@@ -127,7 +126,6 @@ public class GameController {
     ra.addFlashAttribute("saved", true);
     return "redirect:/game";
   }
-
 
   private boolean isHiraganaOnly(String s) {
     if (s == null || s.isEmpty())
