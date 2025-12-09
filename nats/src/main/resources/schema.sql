@@ -14,7 +14,8 @@ CREATE TABLE IF NOT EXISTS images (
   file_path VARCHAR(1024) NOT NULL,
   owner_id VARCHAR(255),
   content_type VARCHAR(255),
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  answer_kana VARCHAR(255)
 );
 
 -- results テーブル（クイズの正答時刻を保存）

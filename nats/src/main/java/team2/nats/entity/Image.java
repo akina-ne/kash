@@ -33,6 +33,9 @@ public class Image {
   @Column(name = "created_at")
   private LocalDateTime createdAt;
 
+  @Column(name = "answer_kana")
+  private String answerKana;
+
   public Image() {
   }
 
@@ -82,6 +85,14 @@ public class Image {
 
   public void setCreatedAt(LocalDateTime createdAt) {
     this.createdAt = createdAt;
+  }
+
+  public String getAnswerKana() {
+    return answerKana;
+  }
+
+  public void setAnswerKana(String answerKana) {
+    this.answerKana = answerKana;
   }
 
   @PrePersist

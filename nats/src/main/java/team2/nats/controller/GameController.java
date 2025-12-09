@@ -1,11 +1,15 @@
+// filepath: c:\Users\kenke\oithomes\isdev\kadai\isdev25\kash\nats\src\main\java\team2\nats\controller\GameController.java
 package team2.nats.controller;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
+import team2.nats.entity.Image;
 import team2.nats.repository.ImageRepository;
 import team2.nats.service.MessageService;
+
+import java.util.Optional;
 
 @Controller
 public class GameController {
@@ -18,20 +22,30 @@ public class GameController {
     this.messageService = messageService;
   }
 
+  /** ゲーム画面表示（おにぎり固定・id=1 を出題） */
   @GetMapping("/game")
   public String game(Model model) {
-    model.addAttribute("images", imageRepository.findAll());
+
+    // id=1 の画像を出題用として取得（おにぎり前提）
+    Optional<Image> opt = imageRepository.findById(1L);
+    opt.ifPresent(img -> model.addAttribute("questionImage", img));
+
+    // フォームオブジェクト
     if (!model.containsAttribute("answerForm")) {
       model.addAttribute("answerForm", new AnswerForm());
     }
-    return "game"; // templates/game.html
+    return "game";
   }
 
+  /** 回答処理（ローマ字で判定） */
   @PostMapping("/game/answer")
   public String answer(@ModelAttribute("answerForm") AnswerForm form, RedirectAttributes ra) {
+
     String content = form.getContent();
+
+    // 入力チェック
     if (content == null || content.trim().isEmpty()) {
-      ra.addFlashAttribute("error", "回答を入力してください");
+      ra.addFlashAttribute("error", "回答を入力してください（ローマ字）");
       ra.addFlashAttribute("answerForm", form);
       return "redirect:/game";
     }
@@ -40,13 +54,64 @@ public class GameController {
       ra.addFlashAttribute("answerForm", form);
       return "redirect:/game";
     }
+
+    // 前後の空白を削除し、小文字にそろえる
+    String normalized = content.trim().toLowerCase();
+
+    // どの画像への回答か（hidden imageId）※null の場合は 1 を見る
+    Long imageId = form.getImageId();
+    if (imageId == null) {
+      imageId = 1L; // おにぎり固定
+    }
+
+    Optional<Image> imageOpt = imageRepository.findById(imageId);
+    if (imageOpt.isEmpty()) {
+      ra.addFlashAttribute("error", "対象の画像が見つかりませんでした");
+      ra.addFlashAttribute("answerForm", form);
+      return "redirect:/game";
+    }
+
+    Image image = imageOpt.get();
+    String answerKana = image.getAnswerKana(); // ここにはローマ字（例: "onigiri"）が入る
+
+    if (answerKana == null || answerKana.isBlank()) {
+      ra.addFlashAttribute("error", "この画像の正解が未設定です");
+      ra.addFlashAttribute("answerForm", form);
+      return "redirect:/game";
+    }
+
+    // 正解文字列も小文字にそろえる
+    String expected = answerKana.trim().toLowerCase();
+
+    // ★ ローマ字で完全一致判定
+    boolean correct = normalized.equals(expected);
+
+    // 入力内容はこれまで通り保存
     messageService.saveMessage(content);
+
+    // 結果メッセージ
+    if (correct) {
+      ra.addFlashAttribute("resultMsg", "正解です！");
+    } else {
+      ra.addFlashAttribute("resultMsg", "不正解です");
+    }
+    ra.addFlashAttribute("answerForm", form);
     ra.addFlashAttribute("saved", true);
     return "redirect:/game";
   }
 
+  /** フォーム用のインナークラス */
   public static class AnswerForm {
+    private Long imageId;
     private String content;
+
+    public Long getImageId() {
+      return imageId;
+    }
+
+    public void setImageId(Long imageId) {
+      this.imageId = imageId;
+    }
 
     public String getContent() {
       return content;
