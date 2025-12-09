@@ -50,8 +50,6 @@ public class GameController {
     }
     model.addAttribute("initialImage", initialImage);
 
-    return "game"; // templates/game.html
-
     // id=1 の画像を出題用として取得（おにぎり前提）
     Optional<Image> opt = imageRepository.findById(1L);
     opt.ifPresent(img -> model.addAttribute("questionImage", img));
