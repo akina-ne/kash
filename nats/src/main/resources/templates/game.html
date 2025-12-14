@@ -173,6 +173,7 @@
     var ZOOM_INITIAL = 1.0; // images.html と同じ
     var ZOOM_DURATION = 30000; // images.html と同じ
     var REDIRECT_URL = '/ranking';
+    var MAX_INITIAL_SCALE = 12; // 破損防止の上限を設定
 
     function clearExistingAnimation(imgEl) {
       var rafId = imgEl && imgEl.dataset && imgEl.dataset.rafId;
@@ -183,13 +184,14 @@
     function showZoom(button) {
       var src = button.getAttribute('data-src');
       var buttonScale = Number(button.getAttribute('data-initial-scale')) || ZOOM_INITIAL;
+      var initialScale = Math.min(buttonScale, MAX_INITIAL_SCALE); // 上限を適用
       var modal = document.getElementById('imgModal');
       var modalImg = document.getElementById('modalImage');
 
       clearExistingAnimation(modalImg);
       modalImg.classList.remove('final');
       modalImg.style.transformOrigin = '50% 50%';
-      modalImg.style.transform = 'scale(' + buttonScale + ')';
+      modalImg.style.transform = 'scale(' + initialScale + ')';
       modalImg.style.opacity = 0;
 
       modalImg.onload = function () {
@@ -202,19 +204,17 @@
           var elapsed = timestamp - start;
           var progress = Math.min(elapsed / duration, 1);
           var eased = easeOutCubic(progress);
-          var currentScale = buttonScale - (buttonScale - 1) * eased;
+          var currentScale = initialScale - (initialScale - 1) * eased;
           modalImg.style.transform = 'scale(' + currentScale + ')';
           if (progress < 1) {
             var rafId = requestAnimationFrame(step);
             modalImg.dataset.rafId = String(rafId);
           } else {
+            // 終了時は直接等倍にしてクラス変更を避ける
             modalImg.style.transform = 'scale(1)';
-            modalImg.classList.add('final');
             delete modalImg.dataset.rafId;
-
             // アニメーション完了時の遷移
             window.location.href = REDIRECT_URL;
-
           }
         }
         var rafId = requestAnimationFrame(step);
@@ -284,7 +284,7 @@
       var fakeButton = {
         getAttribute: function (name) {
           if (name === 'data-src') return imgSrc;
-          if (name === 'data-initial-scale') return '10';
+          if (name === 'data-initial-scale') return '12';
           return null;
         }
       };
