@@ -74,11 +74,64 @@
     load();
     setInterval(load, 10000);
 
-    // ボタンのクリックで /game ページを開く
-    document.getElementById('openImagesBtn').addEventListener('click', function () {
-      window.location.href = '/game';
+    /**
+     * ゲーム開始APIを呼び出す関数.
+     * 「開始」ボタン押下時に1Pから呼び出される.
+     */
+    function requestStartGame() {
+      fetch('/api/game/start', {
+        method: 'POST'
+      }).then(function (response) {
+        if (!response.ok) {
+          console.error('ゲーム開始APIの呼び出しに失敗しました');
+        }
+        return response.json();
+      }).catch(function (error) {
+        console.error('ゲーム開始API呼び出し時にエラーが発生しました', error);
+      });
+    }
+
+    /**
+     * ゲーム開始状態をポーリングで確認し、開始されていれば /game にリダイレクトする.
+     */
+    function startGameStatusPolling() {
+      var pollingIntervalMillis = 2000; // 2秒間隔でポーリング（必要に応じて調整）
+
+      var intervalId = setInterval(function () {
+        fetch('/api/game/status')
+          .then(function (response) {
+            if (!response.ok) {
+              console.error('ゲーム状態取得APIの呼び出しに失敗しました');
+            }
+            return response.json();
+          })
+          .then(function (data) {
+            if (data && data.started === true) {
+              clearInterval(intervalId);
+              window.location.href = '/game';
+            }
+          })
+          .catch(function (error) {
+            console.error('ゲーム状態取得API呼び出し時にエラーが発生しました', error);
+          });
+      }, pollingIntervalMillis);
+    }
+
+    // ページ読み込み完了時の初期化処理
+    document.addEventListener('DOMContentLoaded', function () {
+      // 「開始」ボタンにクリックイベントを設定
+      var startButton = document.getElementById('openImagesBtn');
+      if (startButton) {
+        startButton.addEventListener('click', function () {
+          requestStartGame();
+        });
+      }
+
+      // ページ表示中の全ユーザーでゲーム開始状態をポーリング
+      startGameStatusPolling();
     });
   </script>
+
 </body>
 
 </html>

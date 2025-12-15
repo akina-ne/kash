@@ -11,8 +11,12 @@ import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import team2.nats.entity.Image;
 import team2.nats.repository.ImageRepository;
 import team2.nats.service.MessageService;
-import java.util.List;
+import team2.nats.service.GameStatusService;
+import team2.nats.service.CurrentQuestionService;
 
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 @Controller
@@ -20,34 +24,64 @@ public class GameController {
 
   private final ImageRepository imageRepository;
   private final MessageService messageService;
+  private final GameStatusService gameStatusService;
+  private final CurrentQuestionService currentQuestionService;
 
-  public GameController(ImageRepository imageRepository, MessageService messageService) {
+  public GameController(ImageRepository imageRepository,
+      MessageService messageService,
+      GameStatusService gameStatusService,
+      CurrentQuestionService currentQuestionService) {
     this.imageRepository = imageRepository;
     this.messageService = messageService;
+    this.gameStatusService = gameStatusService;
+    this.currentQuestionService = currentQuestionService;
   }
 
-  /** ゲーム画面表示（おにぎり固定・id=1 を出題） */
+  /** ゲーム画面表示 */
   @GetMapping("/game")
   public String game(Model model) {
     List<Image> imgs = imageRepository.findAll();
     model.addAttribute("images", imgs);
 
-    // 追加: ランダムに初期表示画像を選んでテンプレートに渡す
-    String initialImage = null;
-    if (imgs != null && !imgs.isEmpty()) {
-      Image pick = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
-      // filePath があればそれを使い、なければ /images/{fileName} を作る
-      model.addAttribute("questionImage", pick);
-      if (pick.getFilePath() != null && !pick.getFilePath().isBlank()) {
-        initialImage = pick.getFilePath().startsWith("/") ? pick.getFilePath() : "/" + pick.getFilePath();
+    Image questionImage = null;
+
+    // ★ まず「出題中の画像ID」があれば、それを優先的に使用する
+    Long currentId = currentQuestionService.getCurrentImageId();
+    if (currentId != null) {
+      Optional<Image> byId = imageRepository.findById(currentId);
+      if (byId.isPresent()) {
+        questionImage = byId.get();
+      }
+    }
+
+    // 出題中IDがない、または該当画像が見つからなかった場合は従来どおりランダム
+    if (questionImage == null) {
+      if (imgs != null && !imgs.isEmpty()) {
+        questionImage = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
       } else {
-        initialImage = "/images/" + pick.getFileName();
+        // 画像がなければ既存のデフォルトを使う
+        Optional<Image> fallback = imageRepository.findById(1L);
+        if (fallback.isPresent()) {
+          questionImage = fallback.get();
+        }
+      }
+    }
+
+    // questionImage から initialImage のURLを生成
+    String initialImage;
+    if (questionImage != null) {
+      if (questionImage.getFilePath() != null && !questionImage.getFilePath().isBlank()) {
+        initialImage = questionImage.getFilePath().startsWith("/") ? questionImage.getFilePath()
+            : "/" + questionImage.getFilePath();
+      } else {
+        initialImage = "/images/" + questionImage.getFileName();
       }
     } else {
-      // 画像がなければ既存のデフォルトを使う
+      // 最終的な保険
       initialImage = "/images/onigiri.jpg";
-      model.addAttribute("questionImage", imageRepository.findById(1L));
     }
+
+    model.addAttribute("questionImage", questionImage);
     model.addAttribute("initialImage", initialImage);
 
     // フォームオブジェクト
@@ -57,7 +91,7 @@ public class GameController {
     return "game";
   }
 
-  /** 回答処理（ローマ字で判定） */
+  /** 回答処理（ひらがなで判定） */
   @PostMapping("/game/answer")
   public String answer(@ModelAttribute("answerForm") AnswerForm form, RedirectAttributes ra) {
 
@@ -159,5 +193,57 @@ public class GameController {
     public void setContent(String content) {
       this.content = content;
     }
+  }
+
+  /**
+   * ゲームを開始するAPI.
+   * 「開始」ボタン押下時に1Pから呼び出されることを想定.
+   *
+   * @return started=true を含むレスポンス
+   */
+  @PostMapping("/api/game/start")
+  @ResponseBody
+  public Map<String, Object> startGame() {
+    // 画像一覧からランダム1枚選択して「出題中画像」として保存
+    List<Image> imgs = imageRepository.findAll();
+    Long pickedId = null;
+    if (imgs != null && !imgs.isEmpty()) {
+      Image pick = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
+      pickedId = pick.getId();
+      currentQuestionService.setCurrentImageId(pickedId);
+    } else {
+      // 画像が無い場合は、ID=1 を仮に使う（存在しないなら null のまま）
+      Optional<Image> fallback = imageRepository.findById(1L);
+      if (fallback.isPresent()) {
+        pickedId = fallback.get().getId();
+        currentQuestionService.setCurrentImageId(pickedId);
+      } else {
+        currentQuestionService.resetCurrentImageId();
+      }
+    }
+
+    // ゲーム開始フラグを立てる（一定時間だけ true）
+    gameStatusService.startGame();
+
+    Map<String, Object> response = new HashMap<>();
+    response.put("started", true);
+    response.put("imageId", pickedId);
+    return response;
+  }
+
+  /**
+   * ゲームが開始されたかどうかを取得するAPI.
+   * 全ユーザーが一定間隔でポーリングして利用する.
+   *
+   * @return started: true/false
+   */
+  @GetMapping("/api/game/status")
+  @ResponseBody
+  public Map<String, Object> getGameStatus() {
+    boolean started = gameStatusService.isGameStarted();
+
+    Map<String, Object> response = new HashMap<>();
+    response.put("started", started);
+    return response;
   }
 }
