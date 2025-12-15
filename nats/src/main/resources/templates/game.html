@@ -136,163 +136,147 @@
 
 <body th:attr="data-initial-image=${initialImage}">
   <h1>Game</h1>
-
   <div class="msg" th:if="${error}" style="color:red;">[[${error}]]</div>
   <div class="msg" th:if="${resultMsg}" style="color:blue;">[[${resultMsg}]]</div>
-  <div class="msg" th:if="${saved}" style="color:green;">保存しました。</div>
-
-  <!-- レイアウト: 左に画像ズーム、右にフォーム -->
-  <div class="layout">
-    <!-- 左: 回答フォーム（50%） -->
+  <div class="msg" th:if="${saved}" style="color:green;">保存しました。</div> <!-- レイアウト: 左に画像ズーム、右にフォーム -->
+  <div class="layout"> <!-- 左: 回答フォーム（50%） -->
     <div class="form-area">
-      <form th:action="@{/game/answer}" th:object="${answerForm}" method="post" style="margin-top:0;">
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-
-        <!-- ★ 出題中の画像IDを AnswerForm.imageId に渡す -->
-        <input type="hidden" name="imageId" th:value="${questionImage != null} ? ${questionImage.id} : null" />
-
-        <h2>回答フォーム</h2>
-        <!-- ★ ラベルをひらがな前提に変更 -->
-        <label for="content">回答（ひらがなで入力してください）</label><br />
-        <textarea id="content" th:field="*{content}" rows="12" cols="40" maxlength="1000" required></textarea>
+      <form th:action="@{/game/answer}" th:object="${answerForm}" method="post" style="margin-top:0;"> <input
+          type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <!-- ★ 出題中の画像IDを AnswerForm.imageId に渡す --> <input type="hidden" name="imageId"
+          th:value="${questionImage != null} ? ${questionImage.id} : null" />
+        <h2>回答フォーム</h2> <!-- ★ ラベルをひらがな前提に変更 --> <label for="content">回答（ひらがなで入力してください）</label><br /> <textarea
+          id="content" th:field="*{content}" rows="12" cols="40" maxlength="1000" required></textarea>
         <div style="margin-top:8px;"><button type="submit" class="submit-button">送信</button></div>
-
       </form>
-
-    </div>
-
-    <!-- 右: 画像スペース（50%） -->
+    </div> <!-- 右: 画像スペース（50%） -->
     <div class="image-area">
-      <div id="imgModal" class="modal" onclick="closeModal(event)">
-        <img id="modalImage" src="" alt="画像" />
-      </div>
+      <div id="imgModal" class="modal" onclick="closeModal(event)"> <img id="modalImage" src="" alt="画像" /> </div>
     </div>
   </div>
-
   <script>
     var ZOOM_INITIAL = 1.0; // images.html と同じ
     var ZOOM_DURATION = 30000; // images.html と同じ
     var REDIRECT_URL = '/ranking';
 
     function clearExistingAnimation(imgEl) {
-      var rafId = imgEl && imgEl.dataset && imgEl.dataset.rafId;
-      if (rafId) { cancelAnimationFrame(Number(rafId)); delete imgEl.dataset.rafId; }
-    }
-    function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
-
-    function showZoom(button) {
-      var src = button.getAttribute('data-src');
-      var buttonScale = Number(button.getAttribute('data-initial-scale')) || ZOOM_INITIAL;
-      var modal = document.getElementById('imgModal');
-      var modalImg = document.getElementById('modalImage');
-
-      clearExistingAnimation(modalImg);
-      modalImg.classList.remove('final');
-      modalImg.style.transformOrigin = '50% 50%';
-      modalImg.style.transform = 'scale(' + buttonScale + ')';
-      modalImg.style.opacity = 0;
-
-      modalImg.onload = function () {
-        var start = null;
-        var duration = ZOOM_DURATION;
-        modalImg.style.opacity = 1;
-
-        function step(timestamp) {
-          if (!start) start = timestamp;
-          var elapsed = timestamp - start;
-          var progress = Math.min(elapsed / duration, 1);
-          var eased = easeOutCubic(progress);
-          var currentScale = buttonScale - (buttonScale - 1) * eased;
-          modalImg.style.transform = 'scale(' + currentScale + ')';
-          if (progress < 1) {
-            var rafId = requestAnimationFrame(step);
-            modalImg.dataset.rafId = String(rafId);
-          } else {
-            modalImg.style.transform = 'scale(1)';
-            modalImg.classList.add('final');
-            delete modalImg.dataset.rafId;
-
-            // アニメーション完了時の遷移
-            window.location.href = REDIRECT_URL;
-
-          }
+      var rafId = imgEl && imgEl.dataset &&
+      imgEl.dataset.rafId;
+        if (rafId) { cancelAnimationFrame(Number(rafId));
+          delete imgEl.dataset.rafId; }
         }
-        var rafId = requestAnimationFrame(step);
-        modalImg.dataset.rafId = String(rafId);
-      };
-
-      modalImg.onerror = function () { modalImg.alt = '画像を読み込めませんでした'; modalImg.style.opacity = 1; };
-
-      modal.classList.add('open');
-      try { modalImg.removeAttribute('src'); } catch (e) { modalImg.src = ''; }
-      requestAnimationFrame(function () { modalImg.src = src; });
-    }
-
-    function closeModal(event) {
-      var modal = document.getElementById('imgModal');
-      var modalImg = document.getElementById('modalImage');
-      if (event && event.target === modalImg) return;
-      clearExistingAnimation(modalImg);
-      modalImg.classList.remove('final');
-      modal.classList.remove('open');
-      setTimeout(function () { modalImg.src = ''; modalImg.style.opacity = 0; modalImg.style.transform = ''; }, 200);
-    }
-
-    document.addEventListener('keydown', function (e) {
-      if (e.key === 'Escape') {
-        var modal = document.getElementById('imgModal');
-        if (modal.classList.contains('open')) closeModal();
-      }
-    });
-
-
-    // --- 追加: static/images にファイルがあるかを確認し、存在するなら「画像がありません」メッセージとデフォルトボタンを非表示にする ---
-    (function checkStaticImages() {
-      var candidates = ['/images/onigiri.jpg', '/images/kinkakuji.jpg'];
-      var found = false;
-      var remaining = candidates.length;
-
-      function hideNoImages() {
-        var d = document.getElementById('noImagesDiv');
-        if (d) d.style.display = 'none';
-      }
-
-      candidates.forEach(function (url) {
-        var img = new Image();
-        img.onload = function () {
-          found = true;
-          hideNoImages();
-        };
-        img.onerror = function () {
-          remaining--;
-          if (remaining === 0 && !found) {
-            // どれも存在しない場合はそのまま表示（何もしない）
-          }
-        };
-        // キャッシュ回避のためタイミング差で設定
-        setTimeout(function () {
-          img.src = url;
-        }, 0);
-      });
-    })();
-
-    //shimoさん用に追加
-    // ページ読み込み時におにぎり画像で自動起動（サーバ側で選ばれた画像を使う）
-    document.addEventListener('DOMContentLoaded', function () {
-      var initial = document.body && document.body.dataset && document.body.dataset.initialImage;
-      var imgSrc = initial || '/images/onigiri.jpg';
-      var fakeButton = {
-        getAttribute: function (name) {
-          if (name === 'data-src') return imgSrc;
-          if (name === 'data-initial-scale') return '10';
-          return null;
+        function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3);
         }
-      };
-      // 自動でモーダルを開いてズームアウト開始
-      showZoom(fakeButton);
-    });
 
-  </script>
+        function showZoom(button) {
+          var src = button.getAttribute('data-src');
+          var buttonScale = Number(button.getAttribute('data-initial-scale')) || ZOOM_INITIAL;
+          var modal = document.getElementById('imgModal');
+          var modalImg = document.getElementById('modalImage');
+
+          clearExistingAnimation(modalImg);
+          modalImg.classList.remove('final');
+          modalImg.style.transformOrigin = '50% 50%';
+          modalImg.style.transform = 'scale(' + buttonScale + ')';
+          modalImg.style.opacity = 0;
+
+          modalImg.onload = function () {
+            var start = null;
+            var duration = ZOOM_DURATION;
+            modalImg.style.opacity = 1;
+
+            function step(timestamp) {
+              if (!start) start = timestamp;
+              var elapsed = timestamp - start;
+              var progress = Math.min(elapsed / duration, 1);
+              var eased = easeOutCubic(progress);
+              var currentScale = buttonScale - (buttonScale - 1) * eased;
+              modalImg.style.transform = 'scale(' + currentScale + ')';
+              if (progress < 1) {
+                var rafId = requestAnimationFrame(step);
+                modalImg.dataset.rafId = String(rafId);
+              } else {
+                modalImg.style.transform = 'scale(1)';
+                modalImg.classList.add('final');
+                delete modalImg.dataset.rafId;
+
+                // アニメーション完了時の遷移
+                window.location.href = REDIRECT_URL;
+
+              }
+              } var rafId = requestAnimationFrame(step);
+                  modalImg.dataset.rafId = String(rafId);
+              };
+
+                  modalImg.onerror = function () { modalImg.alt = '画像を読み込めませんでした'; modalImg.style.opacity = 1; };
+
+                  modal.classList.add('open');
+                  try { modalImg.removeAttribute('src'); } catch (e) { modalImg.src = ''; } requestAnimationFrame(function () { modalImg.src = src; }); }
+
+                  function closeModal(event) {
+                  var modal = document.getElementById('imgModal');
+                  var modalImg = document.getElementById('modalImage');
+                  if (event && event.target === modalImg) return;
+
+                  clearExistingAnimation(modalImg);
+                  modalImg.classList.remove('final');
+                  modal.classList.remove('open');
+                  setTimeout(function () {
+                    modalImg.src = '';
+                    modalImg.style.opacity = 0;
+                    modalImg.style.transform = ''; }, 200);
+                  }
+
+                  document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape') {
+                      var modal = document.getElementById('imgModal');
+                    if (modal.classList.contains('open')) closeModal();
+                      }
+                    });
+
+                    // --- 追加: static/images にファイルがあるかを確認し、存在するなら「画像がありません」メッセージとデフォルトボタンを非表示にする ---
+                      (function checkStaticImages() {
+                        var candidates = ['/images/onigiri.jpg', '/images/kinkakuji.jpg'];
+                        var found = false;
+                        var remaining = candidates.length;
+
+                        function hideNoImages() {
+                          var d = document.getElementById('noImagesDiv');
+                          if (d) d.style.display = 'none';
+                        }
+
+                        candidates.forEach(function (url) {
+                          var img = new Image();
+                          img.onload = function () {
+                            found = true; hideNoImages(); };
+                            img.onerror = function () {
+                              remaining--;
+                              if (remaining === 0 && !found) {
+                                // どれも存在しない場合はそのまま表示（何もしない）
+                                }
+                              };
+                               // キャッシュ回避のためタイミング差で設定
+                              setTimeout(function () {
+                                img.src = url;
+                                }, 0);
+                              });
+                            })();
+
+                            //shimoさん用に追加
+                            //ページ読み込み時におにぎり画像で自動起動（サーバ側で選ばれた画像を使う）
+
+                            document.addEventListener('DOMContentLoaded', function () {
+                              var initial = document.body && document.body.dataset && document.body.dataset.initialImage;
+                              var imgSrc = initial || '/images/onigiri.jpg';
+                              var fakeButton = {
+                                getAttribute: function (name) {
+                                  if (name === 'data-src') return imgSrc;
+                                  if (name === 'data-initial-scale') return '10';
+                                  return null; }
+                                };
+                              // 自動でモーダルを開いてズームアウト開始
+                              showZoom(fakeButton); });
+</script>
 </body>
 
 </html>
