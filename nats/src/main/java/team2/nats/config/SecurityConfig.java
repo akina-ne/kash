@@ -8,6 +8,7 @@ import org.springframework.security.core.userdetails.User;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.provisioning.InMemoryUserDetailsManager;
 import org.springframework.security.web.session.HttpSessionEventPublisher;
+
 import team2.nats.security.LoginSuccessHandler;
 import team2.nats.security.LogoutSuccessHandlerImpl;
 
@@ -47,9 +48,9 @@ public class SecurityConfig {
     http
         .authorizeHttpRequests(auth -> auth
             .requestMatchers("/h2-console/**").permitAll()
-            // index.html と / は認証必須に変更（ログアウト後は /login に誘導）
             .requestMatchers("/static/**", "/css/**", "/js/**", "/images/**", "/favicon.ico").permitAll()
             .requestMatchers("/api/online").authenticated()
+            .requestMatchers("/api/game/**").authenticated()
             .anyRequest().authenticated())
         .formLogin(login -> login
             .successHandler(loginSuccessHandler)
@@ -61,7 +62,8 @@ public class SecurityConfig {
             .invalidateHttpSession(true)
             .permitAll())
         .csrf(csrf -> csrf
-            .ignoringRequestMatchers("/h2-console/**"))
+            // AntPathRequestMatcher を使わずに、パス指定で直接除外
+            .ignoringRequestMatchers("/h2-console/**", "/api/game/**"))
         .headers(headers -> headers
             .frameOptions(frameOptions -> frameOptions.sameOrigin()));
     return http.build();
