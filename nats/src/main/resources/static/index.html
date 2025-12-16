@@ -26,7 +26,7 @@
 
     /* 追加: 表示ボタンのスタイル */
     .show-images-button {
-      display: inline-block;
+      display: none;
       margin: 0.5rem 0 1rem 0;
       padding: 8px 12px;
       background: #2d7cff;
@@ -42,28 +42,96 @@
 <body>
   <h1>入室者（入った順）</h1>
   <!-- 追加: 画像表示ページへ移動するボタン -->
-  <button class="show-images-button" id="openImagesBtn">表示</button>
+  <button class="show-images-button" id="openImagesBtn">開始</button>
   <div id="count" class="count"></div>
   <ol id="list"></ol>
   <p><a href="/logout">Logout</a></p>
   <script>
-    const render = (users) => {
+    const render = (data) => {
+      // /api/online から { users: [...], currentUser: "..." } が返る想定
+      const users = data.users || [];
+      const currentUser = data.currentUser;
+
       document.getElementById('count').textContent = '参加人数: ' + users.length + '人';
-      document.getElementById('list').innerHTML = users.map((u, i) => `<li>${i + 1}P ${u}</li>`).join('');
+      document.getElementById('list').innerHTML =
+        users.map((u, i) => `<li>${i + 1}P ${u}</li>`).join('');
+
+      const openBtn = document.getElementById('openImagesBtn');
+
+      // 1プレイヤー: users[0] と現在ログインユーザーが一致する場合だけ表示
+      if (users.length > 0 && currentUser && users[0] === currentUser) {
+        openBtn.style.display = 'inline-block';
+      } else {
+        openBtn.style.display = 'none';
+      }
     };
+
     const load = async () => {
       const r = await fetch('/api/online');
-      render(await r.json());
+      const data = await r.json();
+      render(data);
     };
     load();
     setInterval(load, 10000);
 
-    // ボタンのクリックで /images ページを開く
-    document.getElementById('openImagesBtn').addEventListener('click', function () {
-      // 同じタブで遷移
-      window.location.href = '/images';
+    /**
+     * ゲーム開始APIを呼び出す関数.
+     * 「開始」ボタン押下時に1Pから呼び出される.
+     */
+    function requestStartGame() {
+      fetch('/api/game/start', {
+        method: 'POST'
+      }).then(function (response) {
+        if (!response.ok) {
+          console.error('ゲーム開始APIの呼び出しに失敗しました');
+        }
+        return response.json();
+      }).catch(function (error) {
+        console.error('ゲーム開始API呼び出し時にエラーが発生しました', error);
+      });
+    }
+
+    /**
+     * ゲーム開始状態をポーリングで確認し、開始されていれば /game にリダイレクトする.
+     */
+    function startGameStatusPolling() {
+      var pollingIntervalMillis = 2000; // 2秒間隔でポーリング（必要に応じて調整）
+
+      var intervalId = setInterval(function () {
+        fetch('/api/game/status')
+          .then(function (response) {
+            if (!response.ok) {
+              console.error('ゲーム状態取得APIの呼び出しに失敗しました');
+            }
+            return response.json();
+          })
+          .then(function (data) {
+            if (data && data.started === true) {
+              clearInterval(intervalId);
+              window.location.href = '/game';
+            }
+          })
+          .catch(function (error) {
+            console.error('ゲーム状態取得API呼び出し時にエラーが発生しました', error);
+          });
+      }, pollingIntervalMillis);
+    }
+
+    // ページ読み込み完了時の初期化処理
+    document.addEventListener('DOMContentLoaded', function () {
+      // 「開始」ボタンにクリックイベントを設定
+      var startButton = document.getElementById('openImagesBtn');
+      if (startButton) {
+        startButton.addEventListener('click', function () {
+          requestStartGame();
+        });
+      }
+
+      // ページ表示中の全ユーザーでゲーム開始状態をポーリング
+      startGameStatusPolling();
     });
   </script>
+
 </body>
 
 </html>

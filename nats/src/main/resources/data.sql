@@ -3,3 +3,9 @@
 INSERT INTO users (username, password, role, created_at) VALUES
   ('kash', 'nats', 'USER', CURRENT_TIMESTAMP),
   ('admin', 'adminpass', 'ADMIN', CURRENT_TIMESTAMP);
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('onigiri.jpg', '/images/onigiri.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'おにぎり');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('kinkakuji.jpg', '/images/kinkakuji.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'きんかくじ');
