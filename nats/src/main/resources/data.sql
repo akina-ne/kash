@@ -9,3 +9,28 @@ VALUES ('onigiri.jpg', '/images/onigiri.jpg', 'kash', 'image/jpeg', CURRENT_TIME
 
 INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
 VALUES ('kinkakuji.jpg', '/images/kinkakuji.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'きんかくじ');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('goghs_sunflower.jpg', '/images/goghs_sunflower.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'ごっほのひまわり');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('harrypotter.jpg', '/images/harrypotter.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'はりーぽったー');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('kyabetsu.jpg', '/images/kyabetsu.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'きゃべつ');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('lion.jpg', '/images/lion.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'らいおん');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('Mtfuji.jpg', '/images/Mtfuji.jpg', 'kash', 'image/jpeg
+', CURRENT_TIMESTAMP, 'ふじさん');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('tamago_yaki.jpg', '/images/tamago_yaki.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'たまごやき');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('tokyo_tower.jpg', '/images/tokyo_tower.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'とうきょうたわー');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('hepfive.jpg', '/images/hepfive.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'へっぷふぁいぶ');
