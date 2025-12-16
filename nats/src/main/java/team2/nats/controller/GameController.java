@@ -166,7 +166,7 @@ public class GameController {
       return false;
     for (int i = 0; i < s.length(); i++) {
       char c = s.charAt(i);
-      if (c < 'ぁ' || c > 'ん') {
+      if ((c < 'ぁ' || c > 'ん') && c != 'ー'){
         return false;
       }
     }
