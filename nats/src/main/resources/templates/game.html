@@ -135,6 +135,8 @@
 </head>
 
 <body th:attr="data-initial-image=${initialImage}">
+  <!-- ページ上部に経過秒を表示 -->
+  <div id="elapsedTime" style="position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#fff;padding:6px 10px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:1000;font-weight:600;">経過: 0秒</div>
   <h1>Game</h1>
 
   <div class="msg" th:if="${error}" style="color:red;">[[${error}]]</div>
@@ -174,6 +176,9 @@
     var ZOOM_DURATION = 30000; // images.html と同じ
     var REDIRECT_URL = '/ranking';
     var MAX_INITIAL_SCALE = 12; // 破損防止の上限を設定
+    // 経過タイマー用の変数
+    var gameStartTime = null;
+    var elapsedIntervalId = null;
 
     function clearExistingAnimation(imgEl) {
       var rafId = imgEl && imgEl.dataset && imgEl.dataset.rafId;
@@ -182,6 +187,8 @@
     function easeOutCubic(t) { return 1 - Math.pow(1 - t, 3); }
 
     function showZoom(button) {
+      // ズーム開始時（ゲーム開始）に経過タイマを開始
+      if (!gameStartTime) startElapsedTimer();
       var src = button.getAttribute('data-src');
       var buttonScale = Number(button.getAttribute('data-initial-scale')) || ZOOM_INITIAL;
       var initialScale = Math.min(buttonScale, MAX_INITIAL_SCALE); // 上限を適用
@@ -214,6 +221,8 @@
             modalImg.style.transform = 'scale(1)';
             delete modalImg.dataset.rafId;
             // アニメーション完了時の遷移
+            // タイマを停止してからリダイレクト
+            stopElapsedTimer();
             window.location.href = REDIRECT_URL;
           }
         }
@@ -235,6 +244,8 @@
       clearExistingAnimation(modalImg);
       modalImg.classList.remove('final');
       modal.classList.remove('open');
+      // モーダルを閉じたらタイマを停止
+      stopElapsedTimer();
       setTimeout(function () { modalImg.src = ''; modalImg.style.opacity = 0; modalImg.style.transform = ''; }, 200);
     }
 
@@ -245,6 +256,57 @@
       }
     });
 
+    // 経過時間表示の更新と開始/停止用関数
+    function updateElapsedDisplay() {
+      var el = document.getElementById('elapsedTime');
+      if (!el || !gameStartTime) return;
+      var msTotal = Date.now() - gameStartTime;
+      var s = Math.floor(msTotal / 1000);
+      var msRem = msTotal % 1000;
+      // 表示を ss.fff 形式に整形（秒は最低2桁、ミリ秒は3桁）
+      var secStr = String(s).padStart(2, '0');
+      var msStr = String(msRem).padStart(3, '0');
+      el.textContent = '経過: ' + secStr + '.' + msStr + '秒';
+    }
+    function startElapsedTimer(optionalStart) {
+      // optionalStart が与えられればそれを使う
+      if (optionalStart) {
+        gameStartTime = Number(optionalStart);
+        try { localStorage.setItem('gameStartTime', String(gameStartTime)); } catch (e) { }
+      } else {
+        // localStorage に保存済みの開始時刻があればそれを使う
+        var stored = null;
+        try { stored = localStorage.getItem('gameStartTime'); } catch (e) { stored = null; }
+        if (stored) {
+          gameStartTime = Number(stored);
+        } else {
+          gameStartTime = Date.now();
+          try { localStorage.setItem('gameStartTime', String(gameStartTime)); } catch (e) { }
+        }
+      }
+      updateElapsedDisplay();
+      if (elapsedIntervalId) clearInterval(elapsedIntervalId);
+      elapsedIntervalId = setInterval(updateElapsedDisplay, 50); // 50ms 更新で .fff 表示を滑らかに
+    }
+    function stopElapsedTimer() {
+      if (elapsedIntervalId) { clearInterval(elapsedIntervalId); elapsedIntervalId = null; }
+      try { localStorage.removeItem('gameStartTime'); } catch (e) { }
+      gameStartTime = null;
+      // 最終表示をクリアまたはそのまま残すかは要件次第。ここでは '経過: 0.000秒' に戻す
+      var el = document.getElementById('elapsedTime');
+      if (el) el.textContent = '経過: 00.000秒';
+    }
+
+    // ページ読み込み時に localStorage に開始時刻があればタイマを再開する
+    (function resumeTimerIfNeeded() {
+      try {
+        var stored = localStorage.getItem('gameStartTime');
+        if (stored) {
+          // タイマを開始（既に開始済みであれば startElapsedTimer 内で適切に処理される）
+          startElapsedTimer(stored);
+        }
+      } catch (e) { }
+    })();
 
     // --- 追加: static/images にファイルがあるかを確認し、存在するなら「画像がありません」メッセージとデフォルトボタンを非表示にする ---
     (function checkStaticImages() {
