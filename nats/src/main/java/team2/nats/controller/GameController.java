@@ -2,22 +2,27 @@
 package team2.nats.controller;
 
 import java.util.concurrent.ThreadLocalRandom;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
+import jakarta.servlet.http.HttpSession;
 
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import team2.nats.entity.Image;
 import team2.nats.repository.ImageRepository;
 import team2.nats.service.MessageService;
 import team2.nats.service.GameStatusService;
 import team2.nats.service.CurrentQuestionService;
-
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import team2.nats.service.ResultService;
 
 @Controller
 public class GameController {
@@ -26,20 +31,31 @@ public class GameController {
   private final MessageService messageService;
   private final GameStatusService gameStatusService;
   private final CurrentQuestionService currentQuestionService;
+  private final ResultService resultService;
 
   public GameController(ImageRepository imageRepository,
       MessageService messageService,
       GameStatusService gameStatusService,
-      CurrentQuestionService currentQuestionService) {
+      CurrentQuestionService currentQuestionService,
+      ResultService resultService) {
     this.imageRepository = imageRepository;
     this.messageService = messageService;
     this.gameStatusService = gameStatusService;
     this.currentQuestionService = currentQuestionService;
+    this.resultService = resultService;
   }
 
   /** ゲーム画面表示 */
   @GetMapping("/game")
-  public String game(Model model) {
+  public String game(Model model, HttpSession session) {
+
+    // ★重要:
+    // 不正解で redirect:/game しても「時間計測が継続」するように、
+    // すでに開始時刻がある場合は上書きしない。
+    if (session.getAttribute("quizStart") == null) {
+      session.setAttribute("quizStart", System.currentTimeMillis());
+    }
+
     List<Image> imgs = imageRepository.findAll();
     model.addAttribute("images", imgs);
 
@@ -91,9 +107,11 @@ public class GameController {
     return "game";
   }
 
-  /** 回答処理（ひらがなで判定） */
+  /** 回答処理（ひらがなで判定＋正解時に結果保存） */
   @PostMapping("/game/answer")
-  public String answer(@ModelAttribute("answerForm") AnswerForm form, RedirectAttributes ra) {
+  public String answer(@ModelAttribute("answerForm") AnswerForm form,
+      RedirectAttributes ra,
+      HttpSession session) {
 
     String content = form.getContent();
 
@@ -112,7 +130,7 @@ public class GameController {
     // 前後の空白を削除
     String normalized = content.trim();
 
-    // ★ ひらがなのみ許可
+    // ひらがなのみ許可
     if (!isHiraganaOnly(normalized)) {
       ra.addFlashAttribute("error", "ひらがなのみで入力してください");
       ra.addFlashAttribute("answerForm", form);
@@ -122,7 +140,6 @@ public class GameController {
     // どの画像への回答か（hidden imageId）
     Long imageId = form.getImageId();
     if (imageId == null) {
-      // ★ ここでエラーにせず、メッセージを出して戻す
       ra.addFlashAttribute("error", "画像情報が取得できませんでした。もう一度お試しください。");
       ra.addFlashAttribute("answerForm", form);
       return "redirect:/game";
@@ -144,11 +161,40 @@ public class GameController {
       return "redirect:/game";
     }
 
-    // ★ ひらがなで完全一致判定
+    // ひらがなで完全一致判定
     boolean correct = normalized.equals(answerKana.trim());
 
     // 入力内容はこれまで通り保存
     messageService.saveMessage(content);
+
+    // 正解した場合だけ、/game表示からの経過時間を計算して results テーブルに保存
+    if (correct) {
+      Object startObj = session.getAttribute("quizStart");
+      if (startObj instanceof Long) {
+        long startMs = (Long) startObj;
+        long nowMs = System.currentTimeMillis();
+        long elapsedMs = nowMs - startMs;
+        if (elapsedMs < 0) {
+          elapsedMs = 0L;
+        }
+
+        // ログインユーザー名取得（未ログインなら anonymous）
+        String participant = "anonymous";
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth != null && auth.getName() != null) {
+          participant = auth.getName();
+        }
+
+        try {
+          resultService.saveResult(participant, elapsedMs, true);
+        } catch (Exception e) {
+          e.printStackTrace();
+        }
+
+        // ★正解したときだけリセット（不正解時は継続）
+        session.removeAttribute("quizStart");
+      }
+    }
 
     // 結果メッセージ
     if (correct) {
@@ -166,7 +212,7 @@ public class GameController {
       return false;
     for (int i = 0; i < s.length(); i++) {
       char c = s.charAt(i);
-      if ((c < 'ぁ' || c > 'ん') && c != 'ー'){
+      if ((c < 'ぁ' || c > 'ん') && c != 'ー') {
         return false;
       }
     }
