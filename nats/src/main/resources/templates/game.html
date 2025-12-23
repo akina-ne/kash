@@ -131,6 +131,34 @@
       background: #f0f0f0;
       cursor: pointer;
     }
+
+    /* 〇 / ✕ 表示用の全画面オーバーレイ */
+    .judge-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.8);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      z-index: 9999;
+    }
+
+    .judge-overlay.show {
+      display: flex;
+    }
+
+    .judge-mark {
+      font-size: 20vw;
+      font-weight: bold;
+    }
+
+    .judge-mark.correct {
+      color: #00aa00;
+    }
+
+    .judge-mark.wrong {
+      color: #cc0000;
+    }
   </style>
 </head>
 
@@ -138,6 +166,11 @@
   <!-- ページ上部に経過秒を表示 -->
   <div id="elapsedTime" style="position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#fff;padding:6px 10px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:1000;font-weight:600;">経過: 0秒</div>
   <h1>Game</h1>
+
+  <!-- 〇/✕ オーバーレイ -->
+  <div id="judgeOverlay" class="judge-overlay">
+    <div id="judgeMark" class="judge-mark"></div>
+  </div>
 
   <div class="msg" th:if="${error}" style="color:red;">[[${error}]]</div>
   <div class="msg" th:if="${resultMsg}" style="color:blue;">[[${resultMsg}]]</div>
@@ -147,7 +180,7 @@
   <div class="layout">
     <!-- 左: 回答フォーム（50%） -->
     <div class="form-area">
-      <form th:action="@{/game/answer}" th:object="${answerForm}" method="post" style="margin-top:0;">
+      <form id="answerForm" th:action="@{/game/answer}" th:object="${answerForm}" method="post" style="margin-top:0;">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
 
         <!-- ★ 出題中の画像IDを AnswerForm.imageId に渡す -->
@@ -160,7 +193,6 @@
         <div style="margin-top:8px;"><button type="submit" class="submit-button">送信</button></div>
 
       </form>
-
     </div>
 
     <!-- 右: 画像スペース（50%） -->
@@ -217,7 +249,6 @@
             var rafId = requestAnimationFrame(step);
             modalImg.dataset.rafId = String(rafId);
           } else {
-            // 終了時は直接等倍にしてクラス変更を避ける
             modalImg.style.transform = 'scale(1)';
             delete modalImg.dataset.rafId;
             // アニメーション完了時の遷移
@@ -230,7 +261,10 @@
         modalImg.dataset.rafId = String(rafId);
       };
 
-      modalImg.onerror = function () { modalImg.alt = '画像を読み込めませんでした'; modalImg.style.opacity = 1; };
+      modalImg.onerror = function () {
+        modalImg.alt = '画像を読み込めませんでした';
+        modalImg.style.opacity = 1;
+      };
 
       modal.classList.add('open');
       try { modalImg.removeAttribute('src'); } catch (e) { modalImg.src = ''; }
@@ -244,6 +278,11 @@
       clearExistingAnimation(modalImg);
       modalImg.classList.remove('final');
       modal.classList.remove('open');
+      setTimeout(function () {
+        modalImg.src = '';
+        modalImg.style.opacity = 0;
+        modalImg.style.transform = '';
+      }, 200);
       // モーダルを閉じたらタイマを停止
       stopElapsedTimer();
       setTimeout(function () { modalImg.src = ''; modalImg.style.opacity = 0; modalImg.style.transform = ''; }, 200);
@@ -256,6 +295,7 @@
       }
     });
 
+    // --- static/images にファイルがあるかを確認する既存処理 ---
     // 経過時間表示の更新と開始/停止用関数
     function updateElapsedDisplay() {
       var el = document.getElementById('elapsedTime');
@@ -331,16 +371,39 @@
             // どれも存在しない場合はそのまま表示（何もしない）
           }
         };
-        // キャッシュ回避のためタイミング差で設定
-        setTimeout(function () {
-          img.src = url;
-        }, 0);
+        setTimeout(function () { img.src = url; }, 0);
       });
     })();
 
-    //shimoさん用に追加
-    // ページ読み込み時におにぎり画像で自動起動（サーバ側で選ばれた画像を使う）
+    // ★ 送信フォームを非同期送信にする処理＆初期ズーム起動
     document.addEventListener('DOMContentLoaded', function () {
+      // 非同期送信
+      var form = document.getElementById('answerForm');
+      if (form) {
+        form.addEventListener('submit', function (e) {
+          e.preventDefault(); // ページリロードを防ぐ
+
+          var formData = new FormData(form);
+          var csrfInput = form.querySelector('input[name="_csrf"]');
+          var csrfToken = csrfInput ? csrfInput.value : null;
+
+          fetch(form.getAttribute('action'), {
+            method: 'POST',
+            headers: csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {},
+            body: formData
+          })
+            .then(function (res) { return res.json(); })
+            .then(function (data) {
+              handleAnswerResponse(data);
+            })
+            .catch(function (err) {
+              console.error('回答送信エラー', err);
+              alert('送信中にエラーが発生しました');
+            });
+        });
+      }
+
+      // ページ読み込み時にサーバ側で選ばれた画像で自動ズーム開始
       var initial = document.body && document.body.dataset && document.body.dataset.initialImage;
       var imgSrc = initial || '/images/onigiri.jpg';
       var fakeButton = {
@@ -350,10 +413,55 @@
           return null;
         }
       };
-      // 自動でモーダルを開いてズームアウト開始
       showZoom(fakeButton);
     });
 
+    // ★ サーバ応答に応じて 〇 / ✕ を表示する
+    function handleAnswerResponse(data) {
+      if (!data) {
+        alert('サーバからの応答が不正です');
+        return;
+      }
+
+      // バリデーションやエラー時
+      if (data.success === false && data.error) {
+        alert(data.error);
+        return;
+      }
+
+      if (data.success === true) {
+        var overlay = document.getElementById('judgeOverlay');
+        var mark = document.getElementById('judgeMark');
+        if (!overlay || !mark) {
+          // 万一オーバーレイが無い場合はフォールバック
+          alert(data.message || (data.correct ? '正解です！' : '不正解です'));
+          if (data.correct) {
+            window.location.href = REDIRECT_URL;
+          }
+          return;
+        }
+
+        mark.classList.remove('correct', 'wrong');
+
+        if (data.correct) {
+          // 正解：大きな〇を表示 → 少し待って /ranking に移動
+          mark.textContent = '〇';
+          mark.classList.add('correct');
+          overlay.classList.add('show');
+          setTimeout(function () {
+            window.location.href = REDIRECT_URL;
+          }, 2000);
+        } else {
+          // 不正解：大きな✕を表示 → 2 秒後にオーバーレイだけ消し、そのまま滞在
+          mark.textContent = '✕';
+          mark.classList.add('wrong');
+          overlay.classList.add('show');
+          setTimeout(function () {
+            overlay.classList.remove('show');
+          }, 2000);
+        }
+      }
+    }
   </script>
 </body>
 

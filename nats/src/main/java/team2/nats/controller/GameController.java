@@ -12,7 +12,6 @@ import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -109,22 +108,24 @@ public class GameController {
 
   /** 回答処理（ひらがなで判定＋正解時に結果保存） */
   @PostMapping("/game/answer")
-  public String answer(@ModelAttribute("answerForm") AnswerForm form,
-      RedirectAttributes ra,
+  @ResponseBody
+  public Map<String, Object> answer(@ModelAttribute("answerForm") AnswerForm form,
       HttpSession session) {
+
+    Map<String, Object> response = new HashMap<>();
 
     String content = form.getContent();
 
     // 入力チェック
     if (content == null || content.trim().isEmpty()) {
-      ra.addFlashAttribute("error", "回答を入力してください（ひらがな）");
-      ra.addFlashAttribute("answerForm", form);
-      return "redirect:/game";
+      response.put("success", false);
+      response.put("error", "回答を入力してください（ひらがな）");
+      return response;
     }
     if (content.length() > 1000) {
-      ra.addFlashAttribute("error", "回答は1000文字以内で入力してください");
-      ra.addFlashAttribute("answerForm", form);
-      return "redirect:/game";
+      response.put("success", false);
+      response.put("error", "回答は1000文字以内で入力してください");
+      return response;
     }
 
     // 前後の空白を削除
@@ -132,33 +133,33 @@ public class GameController {
 
     // ひらがなのみ許可
     if (!isHiraganaOnly(normalized)) {
-      ra.addFlashAttribute("error", "ひらがなのみで入力してください");
-      ra.addFlashAttribute("answerForm", form);
-      return "redirect:/game";
+      response.put("success", false);
+      response.put("error", "ひらがなのみで入力してください");
+      return response;
     }
 
     // どの画像への回答か（hidden imageId）
     Long imageId = form.getImageId();
     if (imageId == null) {
-      ra.addFlashAttribute("error", "画像情報が取得できませんでした。もう一度お試しください。");
-      ra.addFlashAttribute("answerForm", form);
-      return "redirect:/game";
+      response.put("success", false);
+      response.put("error", "画像情報が取得できませんでした。もう一度お試しください。");
+      return response;
     }
 
     Optional<Image> imageOpt = imageRepository.findById(imageId);
     if (imageOpt.isEmpty()) {
-      ra.addFlashAttribute("error", "対象の画像が見つかりませんでした");
-      ra.addFlashAttribute("answerForm", form);
-      return "redirect:/game";
+      response.put("success", false);
+      response.put("error", "対象の画像が見つかりませんでした");
+      return response;
     }
 
     Image image = imageOpt.get();
     String answerKana = image.getAnswerKana(); // ここにはひらがなが入る
 
     if (answerKana == null || answerKana.isBlank()) {
-      ra.addFlashAttribute("error", "この画像の正解が未設定です");
-      ra.addFlashAttribute("answerForm", form);
-      return "redirect:/game";
+      response.put("success", false);
+      response.put("error", "この画像の正解が未設定です");
+      return response;
     }
 
     // ひらがなで完全一致判定
@@ -196,15 +197,11 @@ public class GameController {
       }
     }
 
-    // 結果メッセージ
-    if (correct) {
-      ra.addFlashAttribute("resultMsg", "正解です！");
-    } else {
-      ra.addFlashAttribute("resultMsg", "不正解です");
-    }
-    ra.addFlashAttribute("answerForm", form);
-    ra.addFlashAttribute("saved", true);
-    return "redirect:/game";
+    // JSON レスポンス
+    response.put("success", true);
+    response.put("correct", correct);
+    response.put("message", correct ? "正解です！" : "不正解です");
+    return response;
   }
 
   private boolean isHiraganaOnly(String s) {
