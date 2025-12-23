@@ -242,7 +242,7 @@ public class GameController {
    * ゲームを開始するAPI.
    * 「開始」ボタン押下時に1Pから呼び出されることを想定.
    *
-   * @return started=true を含むレスポンス
+   * 既存の即時開始APIは維持する（互換性のため）。
    */
   @PostMapping("/api/game/start")
   @ResponseBody
@@ -275,18 +275,63 @@ public class GameController {
   }
 
   /**
+   * カウントダウンを開始するAPI.
+   * フロントは 1P がボタンを押したときにこれを呼び、全員が /api/game/status をポーリングして
+   * カウントダウンを同期表示する想定.
+   *
+   * @param durationMillis カウントダウンの長さ（ミリ秒） 任意。指定がない場合 3000 ms を使う。
+   */
+  @PostMapping("/api/game/start-countdown")
+  @ResponseBody
+  public Map<String, Object> startCountdown(
+      @RequestParam(value = "durationMillis", required = false) Long durationMillis) {
+    long duration = (durationMillis == null) ? 3000L : durationMillis.longValue();
+
+    // 画像一覧からランダム1枚選択して「出題中画像」として保存（カウントダウン中に決定しておく）
+    List<Image> imgs = imageRepository.findAll();
+    Long pickedId = null;
+    if (imgs != null && !imgs.isEmpty()) {
+      Image pick = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
+      pickedId = pick.getId();
+      currentQuestionService.setCurrentImageId(pickedId);
+    } else {
+      Optional<Image> fallback = imageRepository.findById(1L);
+      if (fallback.isPresent()) {
+        pickedId = fallback.get().getId();
+        currentQuestionService.setCurrentImageId(pickedId);
+      } else {
+        currentQuestionService.resetCurrentImageId();
+      }
+    }
+
+    // カウントダウンを開始（この間 isGameStarted() は false を返すが、getCountdownRemainingMillis()
+    // で残時間を取得できる）
+    gameStatusService.startCountdown(duration);
+
+    Map<String, Object> response = new HashMap<>();
+    response.put("countdownMillis", duration);
+    response.put("imageId", pickedId);
+    response.put("started", false);
+    return response;
+  }
+
+  /**
    * ゲームが開始されたかどうかを取得するAPI.
    * 全ユーザーが一定間隔でポーリングして利用する.
    *
-   * @return started: true/false
+   * レスポンスにカウントダウン残り時間（remainingMillis）を含める。
+   *
+   * @return started: true/false, remainingMillis: 残りミリ秒（カウントダウン未実行時は0）
    */
   @GetMapping("/api/game/status")
   @ResponseBody
   public Map<String, Object> getGameStatus() {
     boolean started = gameStatusService.isGameStarted();
+    long remaining = gameStatusService.getCountdownRemainingMillis();
 
     Map<String, Object> response = new HashMap<>();
     response.put("started", started);
+    response.put("remainingMillis", remaining);
     return response;
   }
 }
