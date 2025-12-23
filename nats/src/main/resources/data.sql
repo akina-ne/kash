@@ -34,3 +34,15 @@ VALUES ('tokyo_tower.jpg', '/images/tokyo_tower.jpg', 'kash', 'image/jpeg', CURR
 
 INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
 VALUES ('hepfive.jpg', '/images/hepfive.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'へっぷふぁいぶ');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('jiyunomegami.jpg', '/images/jiyunomegami.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'じゆうのめがみ');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('kokkaigijido.jpg', '/images/kokkaigijido.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'こっかいぎじどう');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('panda.jpg', '/images/panda.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'ぱんだ');
+
+INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
+VALUES ('retasu.jpg', '/images/retasu.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'れたす');
