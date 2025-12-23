@@ -26,4 +26,10 @@ public class ResultService {
   public List<RankingDto> getRankings() {
     return resultRepository.findBestTimes();
   }
+
+  /** ★ランキング（results）を全リセット */
+  public void resetRankings() {
+    resultRepository.deleteAllResults();
+    // もしくは resultRepository.deleteAll(); でもOK（ただし大量データだと遅くなる）
+  }
 }

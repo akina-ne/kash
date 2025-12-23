@@ -21,11 +21,44 @@
     th {
       background: #f2f2f2;
     }
+
+    .show-images-button {
+      display: block;
+      margin: 16px auto 0 auto;
+      padding: 14px 28px;
+      background: #2d7cff;
+      color: #fff;
+      border: none;
+      border-radius: 28px;
+      cursor: pointer;
+      font-size: 18px;
+      box-shadow: 0 6px 18px rgba(45, 124, 255, 0.25);
+      transition: transform .12s ease;
+    }
+
+    .show-images-button:hover {
+      transform: scale(1.04);
+    }
+
+    .show-images-button:active {
+      transform: scale(1.00);
+    }
+
+    .hint {
+      text-align: center;
+      color: #666;
+      margin-top: 8px;
+      font-size: 14px;
+    }
   </style>
 </head>
 
 <body>
   <h1 style="text-align:center;">ランキング</h1>
+
+  <button class="show-images-button" id="playAgainBtn" style="display:none;">もう一度遊ぶ</button>
+  <div class="hint" id="playAgainHint" style="display:none;">※1Pのみ押せます</div>
+
   <table>
     <thead>
       <tr>
@@ -34,7 +67,7 @@
         <th>タイム</th>
       </tr>
     </thead>
-    <tbody>
+    <tbody id="rankingBody">
       <tr th:each="row, iterStat : ${rankings}">
         <td th:text="${iterStat.index + 1}"></td>
         <td th:text="${row.name}"></td>
@@ -42,6 +75,126 @@
       </tr>
     </tbody>
   </table>
+
+  <script>
+    var POLL_STATUS_MS = 250;
+    var POLL_RANKING_MS = 1000;
+    var REDIRECT_LOBBY_URL = '/';
+
+    function renderRankings(rows) {
+      var tbody = document.getElementById('rankingBody');
+      if (!tbody) return;
+
+      tbody.innerHTML = '';
+      (rows || []).forEach(function (row, idx) {
+        var tr = document.createElement('tr');
+
+        var tdRank = document.createElement('td');
+        tdRank.textContent = String(idx + 1);
+
+        var tdName = document.createElement('td');
+        tdName.textContent = row && row.name != null ? String(row.name) : '-';
+
+        var tdTime = document.createElement('td');
+        var ms = row && row.bestTimeMs != null ? Number(row.bestTimeMs) : null;
+        if (ms == null || isNaN(ms)) {
+          tdTime.textContent = '-';
+        } else {
+          var s = Math.floor(ms / 1000);
+          var mm = Math.floor(s / 60);
+          var ss = s % 60;
+          var ms3 = ms % 1000;
+          tdTime.textContent =
+            String(mm).padStart(2, '0') + ':' +
+            String(ss).padStart(2, '0') + '.' +
+            String(ms3).padStart(3, '0');
+        }
+
+        tr.appendChild(tdRank);
+        tr.appendChild(tdName);
+        tr.appendChild(tdTime);
+        tbody.appendChild(tr);
+      });
+    }
+
+    async function updatePlayAgainVisibility() {
+      try {
+        var r = await fetch('/api/online');
+        var data = await r.json();
+        var users = (data && data.users) ? data.users : [];
+        var currentUser = data ? data.currentUser : null;
+
+        var is1P = false;
+        if (users.length > 0 && currentUser && users[0] === currentUser) {
+          is1P = true;
+        }
+
+        var btn = document.getElementById('playAgainBtn');
+        var hint = document.getElementById('playAgainHint');
+        if (btn) btn.style.display = is1P ? 'block' : 'none';
+        if (hint) hint.style.display = is1P ? 'block' : 'none';
+      } catch (e) {
+        console.error('online fetch failed', e);
+      }
+    }
+
+    function redirectToLobby() {
+      try { localStorage.removeItem('gameStartTime'); } catch (e) { }
+      window.location.href = REDIRECT_LOBBY_URL;
+    }
+
+    function startStatusPollingForRedirect() {
+      setInterval(function () {
+        fetch('/api/game/status')
+          .then(function (res) { return res.json(); })
+          .then(function (data) {
+            if (!data) return;
+            if (data.resetRequested === true) {
+              redirectToLobby();
+            }
+          })
+          .catch(function (err) {
+            console.error('status poll failed', err);
+          });
+      }, POLL_STATUS_MS);
+    }
+
+    function startRankingAutoRefresh() {
+      setInterval(function () {
+        fetch('/api/rankings')
+          .then(function (res) { return res.json(); })
+          .then(function (rows) {
+            renderRankings(rows);
+          })
+          .catch(function (err) {
+            console.error('rankings fetch failed', err);
+          });
+      }, POLL_RANKING_MS);
+    }
+
+    document.addEventListener('DOMContentLoaded', function () {
+      updatePlayAgainVisibility();
+      setInterval(updatePlayAgainVisibility, 10000);
+
+      startStatusPollingForRedirect();
+      startRankingAutoRefresh();
+
+      var btn = document.getElementById('playAgainBtn');
+      if (btn) {
+        btn.addEventListener('click', function () {
+          btn.disabled = true;
+          try { localStorage.removeItem('gameStartTime'); } catch (e) { }
+
+          fetch('/api/game/reset', { method: 'POST' })
+            .catch(function (err) {
+              console.error('reset failed', err);
+              btn.disabled = false;
+            });
+          // 2秒間 resetRequested=true なので、全員がそれぞれ検知して / に戻る
+        });
+      }
+    });
+  </script>
 </body>
 
 </html>
