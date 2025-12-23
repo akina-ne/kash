@@ -164,7 +164,9 @@
 
 <body th:attr="data-initial-image=${initialImage}">
   <!-- ページ上部に経過秒を表示 -->
-  <div id="elapsedTime" style="position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#fff;padding:6px 10px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:1000;font-weight:600;">経過: 0秒</div>
+  <div id="elapsedTime"
+    style="position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#fff;padding:6px 10px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:1000;font-weight:600;">
+    経過: 0秒</div>
   <h1>Game</h1>
 
   <!-- 〇/✕ オーバーレイ -->
@@ -308,22 +310,9 @@
       var msStr = String(msRem).padStart(3, '0');
       el.textContent = '経過: ' + secStr + '.' + msStr + '秒';
     }
-    function startElapsedTimer(optionalStart) {
-      // optionalStart が与えられればそれを使う
-      if (optionalStart) {
-        gameStartTime = Number(optionalStart);
-        try { localStorage.setItem('gameStartTime', String(gameStartTime)); } catch (e) { }
-      } else {
-        // localStorage に保存済みの開始時刻があればそれを使う
-        var stored = null;
-        try { stored = localStorage.getItem('gameStartTime'); } catch (e) { stored = null; }
-        if (stored) {
-          gameStartTime = Number(stored);
-        } else {
-          gameStartTime = Date.now();
-          try { localStorage.setItem('gameStartTime', String(gameStartTime)); } catch (e) { }
-        }
-      }
+    function startElapsedTimer() {
+      // 常にリセットしてスタート
+      gameStartTime = Date.now();
       updateElapsedDisplay();
       if (elapsedIntervalId) clearInterval(elapsedIntervalId);
       elapsedIntervalId = setInterval(updateElapsedDisplay, 50); // 50ms 更新で .fff 表示を滑らかに
