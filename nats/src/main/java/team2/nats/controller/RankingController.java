@@ -1,5 +1,6 @@
 package team2.nats.controller;
 
+import jakarta.servlet.http.HttpSession;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.ModelMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -22,7 +23,9 @@ public class RankingController {
   }
 
   @GetMapping("/ranking")
-  public String ranking(ModelMap model) {
+  public String ranking(ModelMap model, HttpSession session) {
+    session.removeAttribute("quizStart");
+
     model.addAttribute("rankings", resultService.getRankings());
     return "ranking"; // Thymeleaf template ranking.html
   }

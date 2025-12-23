@@ -1,4 +1,3 @@
-// filepath: c:\Users\kenke\oithomes\isdev\kadai\isdev25\kash\nats\src\main\java\team2\nats\controller\GameController.java
 package team2.nats.controller;
 
 import java.util.concurrent.ThreadLocalRandom;
@@ -16,6 +15,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
+import team2.nats.dto.RankingDto;
 import team2.nats.entity.Image;
 import team2.nats.repository.ImageRepository;
 import team2.nats.service.MessageService;
@@ -44,13 +44,16 @@ public class GameController {
     this.resultService = resultService;
   }
 
-  /** ゲーム画面表示 */
   @GetMapping("/game")
-  public String game(Model model, HttpSession session) {
+  public String game(
+      Model model,
+      HttpSession session,
+      @RequestParam(value = "reset", required = false) Integer reset) {
 
-    // ★重要:
-    // 不正解で redirect:/game しても「時間計測が継続」するように、
-    // すでに開始時刻がある場合は上書きしない。
+    if (reset != null && reset.intValue() == 1) {
+      session.removeAttribute("quizStart");
+    }
+
     if (session.getAttribute("quizStart") == null) {
       session.setAttribute("quizStart", System.currentTimeMillis());
     }
@@ -60,7 +63,6 @@ public class GameController {
 
     Image questionImage = null;
 
-    // ★ まず「出題中の画像ID」があれば、それを優先的に使用する
     Long currentId = currentQuestionService.getCurrentImageId();
     if (currentId != null) {
       Optional<Image> byId = imageRepository.findById(currentId);
@@ -69,12 +71,10 @@ public class GameController {
       }
     }
 
-    // 出題中IDがない、または該当画像が見つからなかった場合は従来どおりランダム
     if (questionImage == null) {
       if (imgs != null && !imgs.isEmpty()) {
         questionImage = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
       } else {
-        // 画像がなければ既存のデフォルトを使う
         Optional<Image> fallback = imageRepository.findById(1L);
         if (fallback.isPresent()) {
           questionImage = fallback.get();
@@ -82,7 +82,6 @@ public class GameController {
       }
     }
 
-    // questionImage から initialImage のURLを生成
     String initialImage;
     if (questionImage != null) {
       if (questionImage.getFilePath() != null && !questionImage.getFilePath().isBlank()) {
@@ -92,21 +91,18 @@ public class GameController {
         initialImage = "/images/" + questionImage.getFileName();
       }
     } else {
-      // 最終的な保険
       initialImage = "/images/onigiri.jpg";
     }
 
     model.addAttribute("questionImage", questionImage);
     model.addAttribute("initialImage", initialImage);
 
-    // フォームオブジェクト
     if (!model.containsAttribute("answerForm")) {
       model.addAttribute("answerForm", new AnswerForm());
     }
     return "game";
   }
 
-  /** 回答処理（ひらがなで判定＋正解時に結果保存） */
   @PostMapping("/game/answer")
   @ResponseBody
   public Map<String, Object> answer(@ModelAttribute("answerForm") AnswerForm form,
@@ -116,7 +112,6 @@ public class GameController {
 
     String content = form.getContent();
 
-    // 入力チェック
     if (content == null || content.trim().isEmpty()) {
       response.put("success", false);
       response.put("error", "回答を入力してください（ひらがな）");
@@ -128,17 +123,14 @@ public class GameController {
       return response;
     }
 
-    // 前後の空白を削除
     String normalized = content.trim();
 
-    // ひらがなのみ許可
     if (!isHiraganaOnly(normalized)) {
       response.put("success", false);
       response.put("error", "ひらがなのみで入力してください");
       return response;
     }
 
-    // どの画像への回答か（hidden imageId）
     Long imageId = form.getImageId();
     if (imageId == null) {
       response.put("success", false);
@@ -154,7 +146,7 @@ public class GameController {
     }
 
     Image image = imageOpt.get();
-    String answerKana = image.getAnswerKana(); // ここにはひらがなが入る
+    String answerKana = image.getAnswerKana();
 
     if (answerKana == null || answerKana.isBlank()) {
       response.put("success", false);
@@ -162,24 +154,19 @@ public class GameController {
       return response;
     }
 
-    // ひらがなで完全一致判定
     boolean correct = normalized.equals(answerKana.trim());
 
-    // 入力内容はこれまで通り保存
     messageService.saveMessage(content);
 
-    // 正解した場合だけ、/game表示からの経過時間を計算して results テーブルに保存
     if (correct) {
       Object startObj = session.getAttribute("quizStart");
       if (startObj instanceof Long) {
         long startMs = (Long) startObj;
         long nowMs = System.currentTimeMillis();
         long elapsedMs = nowMs - startMs;
-        if (elapsedMs < 0) {
+        if (elapsedMs < 0)
           elapsedMs = 0L;
-        }
 
-        // ログインユーザー名取得（未ログインなら anonymous）
         String participant = "anonymous";
         Authentication auth = SecurityContextHolder.getContext().getAuthentication();
         if (auth != null && auth.getName() != null) {
@@ -192,12 +179,10 @@ public class GameController {
           e.printStackTrace();
         }
 
-        // ★正解したときだけリセット（不正解時は継続）
         session.removeAttribute("quizStart");
       }
     }
 
-    // JSON レスポンス
     response.put("success", true);
     response.put("correct", correct);
     response.put("message", correct ? "正解です！" : "不正解です");
@@ -216,7 +201,6 @@ public class GameController {
     return true;
   }
 
-  /** フォーム用のインナークラス */
   public static class AnswerForm {
     private Long imageId;
     private String content;
@@ -238,16 +222,9 @@ public class GameController {
     }
   }
 
-  /**
-   * ゲームを開始するAPI.
-   * 「開始」ボタン押下時に1Pから呼び出されることを想定.
-   *
-   * 既存の即時開始APIは維持する（互換性のため）。
-   */
   @PostMapping("/api/game/start")
   @ResponseBody
   public Map<String, Object> startGame() {
-    // 画像一覧からランダム1枚選択して「出題中画像」として保存
     List<Image> imgs = imageRepository.findAll();
     Long pickedId = null;
     if (imgs != null && !imgs.isEmpty()) {
@@ -255,7 +232,6 @@ public class GameController {
       pickedId = pick.getId();
       currentQuestionService.setCurrentImageId(pickedId);
     } else {
-      // 画像が無い場合は、ID=1 を仮に使う（存在しないなら null のまま）
       Optional<Image> fallback = imageRepository.findById(1L);
       if (fallback.isPresent()) {
         pickedId = fallback.get().getId();
@@ -265,7 +241,6 @@ public class GameController {
       }
     }
 
-    // ゲーム開始フラグを立てる（一定時間だけ true）
     gameStatusService.startGame();
 
     Map<String, Object> response = new HashMap<>();
@@ -274,20 +249,12 @@ public class GameController {
     return response;
   }
 
-  /**
-   * カウントダウンを開始するAPI.
-   * フロントは 1P がボタンを押したときにこれを呼び、全員が /api/game/status をポーリングして
-   * カウントダウンを同期表示する想定.
-   *
-   * @param durationMillis カウントダウンの長さ（ミリ秒） 任意。指定がない場合 3000 ms を使う。
-   */
   @PostMapping("/api/game/start-countdown")
   @ResponseBody
   public Map<String, Object> startCountdown(
       @RequestParam(value = "durationMillis", required = false) Long durationMillis) {
     long duration = (durationMillis == null) ? 3000L : durationMillis.longValue();
 
-    // 画像一覧からランダム1枚選択して「出題中画像」として保存（カウントダウン中に決定しておく）
     List<Image> imgs = imageRepository.findAll();
     Long pickedId = null;
     if (imgs != null && !imgs.isEmpty()) {
@@ -304,8 +271,6 @@ public class GameController {
       }
     }
 
-    // カウントダウンを開始（この間 isGameStarted() は false を返すが、getCountdownRemainingMillis()
-    // で残時間を取得できる）
     gameStatusService.startCountdown(duration);
 
     Map<String, Object> response = new HashMap<>();
@@ -315,23 +280,41 @@ public class GameController {
     return response;
   }
 
-  /**
-   * ゲームが開始されたかどうかを取得するAPI.
-   * 全ユーザーが一定間隔でポーリングして利用する.
-   *
-   * レスポンスにカウントダウン残り時間（remainingMillis）を含める。
-   *
-   * @return started: true/false, remainingMillis: 残りミリ秒（カウントダウン未実行時は0）
-   */
   @GetMapping("/api/game/status")
   @ResponseBody
   public Map<String, Object> getGameStatus() {
     boolean started = gameStatusService.isGameStarted();
     long remaining = gameStatusService.getCountdownRemainingMillis();
+    boolean resetRequested = gameStatusService.isResetRequested();
 
     Map<String, Object> response = new HashMap<>();
     response.put("started", started);
     response.put("remainingMillis", remaining);
+    response.put("resetRequested", resetRequested);
     return response;
+  }
+
+  @PostMapping("/api/game/reset")
+  @ResponseBody
+  public Map<String, Object> resetGame(HttpSession session) {
+    session.removeAttribute("quizStart");
+    currentQuestionService.resetCurrentImageId();
+    gameStatusService.resetGame();
+
+    // ★追加：ランキング（results）もリセット
+    resultService.resetRankings();
+
+    // ★全員へ通知（2秒間 true）
+    gameStatusService.requestReset();
+
+    Map<String, Object> response = new HashMap<>();
+    response.put("ok", true);
+    return response;
+  }
+
+  @GetMapping("/api/rankings")
+  @ResponseBody
+  public List<RankingDto> rankings() {
+    return resultService.getRankings();
   }
 }
