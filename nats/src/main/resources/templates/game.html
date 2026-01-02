@@ -392,6 +392,19 @@
         });
       }
 
+      // Enterキーで送信（通常の改行は不要、Enterで1ワード送信する想定）
+      var textarea = document.getElementById('content');
+      if (textarea && form) {
+        textarea.addEventListener('keydown', function (e) {
+          // Enter 押下で送信（Shift/Alt/Ctrl 等複合キーは無視して Enter 単独のみ）
+          if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
+            e.preventDefault(); // 改行を防ぐ
+            // 既存の submit ハンドラを通すために submit イベントを発火
+            form.dispatchEvent(new Event('submit', { bubbles: true, cancelable: true }));
+          }
+        });
+      }
+
       // ページ読み込み時にサーバ側で選ばれた画像で自動ズーム開始
       var initial = document.body && document.body.dataset && document.body.dataset.initialImage;
       var imgSrc = initial || '/images/onigiri.jpg';
