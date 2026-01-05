@@ -9,8 +9,9 @@ import team2.nats.entity.Result;
 
 public interface ResultRepository extends JpaRepository<Result, Long> {
 
-  @Query("SELECT new team2.nats.dto.RankingDto(r.participantName, MIN(r.elapsedMs)) " +
-      "FROM Result r WHERE r.correct = true GROUP BY r.participantName ORDER BY MIN(r.elapsedMs) ASC")
+  // ★合計時間でランキング
+  @Query("SELECT new team2.nats.dto.RankingDto(r.participantName, SUM(r.elapsedMs)) " +
+      "FROM Result r WHERE r.correct = true GROUP BY r.participantName ORDER BY SUM(r.elapsedMs) ASC")
   List<RankingDto> findBestTimes();
 
   /** ★ランキングリセット用：results を全削除 */
