@@ -214,6 +214,51 @@
     var gameStartTime = null;
     var elapsedIntervalId = null;
 
+    // ===== BGM 関連 =====
+    // ページごとに 1 つの BGM を管理するための Audio インスタンス
+    var bgmAudio = null;
+
+    /**
+     * 指定されたファイル名の BGM をループ再生する
+     * 例: playBgm('game.mp3') -> /bgm/game.mp3 を再生
+     */
+    function playBgm(bgmFileName) {
+      // すでに再生中なら止める
+      if (bgmAudio) {
+        try {
+          bgmAudio.pause();
+        } catch (e) { }
+        bgmAudio = null;
+      }
+
+      if (!bgmFileName) {
+        return;
+      }
+
+      var src = '/bgm/' + bgmFileName;
+      var audio = new Audio(src);
+      audio.loop = true;
+
+      // 自動再生ブロック対策: 再生エラーを握りつぶしてコンソールにだけ出す
+      audio.play().catch(function (err) {
+        console.warn('BGM 再生がブロックされました: ', err);
+      });
+
+      bgmAudio = audio;
+    }
+
+    /**
+     * 現在の BGM を停止する
+     */
+    function stopBgm() {
+      if (bgmAudio) {
+        try {
+          bgmAudio.pause();
+        } catch (e) { }
+        bgmAudio = null;
+      }
+    }
+
     function clearExistingAnimation(imgEl) {
       var rafId = imgEl && imgEl.dataset && imgEl.dataset.rafId;
       if (rafId) { cancelAnimationFrame(Number(rafId)); delete imgEl.dataset.rafId; }
@@ -256,6 +301,7 @@
             // アニメーション完了時の遷移
             // タイマを停止してからリダイレクト
             stopElapsedTimer();
+            stopBgm(); // ★ BGM 停止
             window.location.href = REDIRECT_URL;
           }
         }
@@ -416,6 +462,10 @@
         }
       };
       showZoom(fakeButton);
+
+      // ★ BGM 再生: 好きなファイル名に差し替えてください
+      // 例: 'game.mp3' -> src/main/resources/static/bgm/game.mp3
+      playBgm('Demo2.mp3');
     });
 
     // ★ サーバ応答に応じて 〇 / ✕ を表示する

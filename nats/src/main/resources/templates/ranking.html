@@ -193,7 +193,53 @@
           // 2秒間 resetRequested=true なので、全員がそれぞれ検知して / に戻る
         });
       }
+      playBgm('Demo1.mp3');
     });
+
+    // ===== BGM 関連 =====
+    // ページごとに 1 つの BGM を管理するための Audio インスタンス
+    var bgmAudio = null;
+
+    /**
+     * 指定されたファイル名の BGM をループ再生する
+     * 例: playBgm('game.mp3') -> /bgm/game.mp3 を再生
+     */
+    function playBgm(bgmFileName) {
+      // すでに再生中なら止める
+      if (bgmAudio) {
+        try {
+          bgmAudio.pause();
+        } catch (e) { }
+        bgmAudio = null;
+      }
+
+      if (!bgmFileName) {
+        return;
+      }
+
+      var src = '/bgm/' + bgmFileName;
+      var audio = new Audio(src);
+      audio.loop = true;
+
+      // 自動再生ブロック対策: 再生エラーを握りつぶしてコンソールにだけ出す
+      audio.play().catch(function (err) {
+        console.warn('BGM 再生がブロックされました: ', err);
+      });
+
+      bgmAudio = audio;
+    }
+
+    /**
+     * 現在の BGM を停止する
+     */
+    function stopBgm() {
+      if (bgmAudio) {
+        try {
+          bgmAudio.pause();
+        } catch (e) { }
+        bgmAudio = null;
+      }
+    }
   </script>
 </body>
 
