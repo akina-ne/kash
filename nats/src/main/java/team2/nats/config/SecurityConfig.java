@@ -38,7 +38,60 @@ public class SecurityConfig {
         .password("{bcrypt}$2y$05$nz9no3aAc.9WN6RU.CbSbeScoi8bVr0bxs0Vj8ISiCt6at5wg/0U.")
         .roles("USER").build();
 
-    return new InMemoryUserDetailsManager(kash, ken, shimo, akina, tsuna);
+    UserDetails Z2762 = User.withUsername("Z2762")
+        .password("{bcrypt}$2y$05$JjVGtr/1bQqHi0OK7GjRUuIsTCK1tR4r/EN.gS4s52wZIdQTRthi2")
+        .roles("USER").build();
+    UserDetails Z2789 = User.withUsername("Z2789")
+        .password("{bcrypt}$2y$05$XgANuuRAVctEV4lpFEaUA.9trP2PZsYZvRzPjvnMMV85B2c3G1C2e")
+        .roles("USER").build();
+    UserDetails Z2819 = User.withUsername("Z2819")
+        .password("{bcrypt}$2y$05$id7UHGyOLLTMPWGggqnKdepx2O.IaLz5o/TxgJkHosUfQYHahuOxC")
+        .roles("USER").build();
+    UserDetails Z2911 = User.withUsername("Z2911")
+        .password("{bcrypt}$2y$05$eLXMYkpH4IdC2MbREeVr7.KLFDtnbWao4Bw3.Aff1uQxXXXNMpB5G")
+        .roles("USER").build();
+    UserDetails Z2946 = User.withUsername("Z2946")
+        .password("{bcrypt}$2y$05$XSZdTje2Rb/0oZZG1meLg.TvP3cL3v2bUWENoxTxQ8kaijKZQ7W9e")
+        .roles("USER").build();
+    UserDetails Z2974 = User.withUsername("Z2974")
+        .password("{bcrypt}$2y$05$P5.bktxMnmX4o3V7vzOg7OZiHlKOk.IZC4R3n.78oJVJJR8reiPD6")
+        .roles("USER").build();
+    UserDetails Z3052 = User.withUsername("Z3052")
+        .password("{bcrypt}$2y$05$Gm3109HRJJEwVxnD4QYvCuUeOergko5lrHqkyOyEQZqPXRLiMMShW")
+        .roles("USER").build();
+    UserDetails Z3055 = User.withUsername("Z3055")
+        .password("{bcrypt}$2y$05$SLtMSMq/hnn80Nv.e3FYP.PBbOWm3F3r8SjBByOJO6ugGlDDvpH4K")
+        .roles("USER").build();
+    UserDetails Z3065 = User.withUsername("Z3065")
+        .password("{bcrypt}$2y$05$AoDLZxu5lK9AEdwol8l4au0tUY7z7yhjo95VmJHKqG/zaHgpk6PZu")
+        .roles("USER").build();
+    UserDetails Z3069 = User.withUsername("Z3069")
+        .password("{bcrypt}$2y$05$r9MSy2wnPa4hF7KP.AOtqeCKJ1Y1XUAE5lGHRLhEayRpquXcij0H6")
+        .roles("USER").build();
+    UserDetails Z3182 = User.withUsername("Z3182")
+        .password("{bcrypt}$2y$05$e1og2Sbwt4U54RN8WQIKDOykO.NDagp4d0U/2y64jGpUzWil2NcJe")
+        .roles("USER").build();
+    UserDetails Z4272 = User.withUsername("Z4272")
+        .password("{bcrypt}$2y$05$yFB0cU7ro00gW7Xz8Swmoe9w.D3StHKUHfhMgkysXlbO0cY7xK3aC")
+        .roles("USER").build();
+    UserDetails 本田 = User.withUsername("本田")
+        .password("{bcrypt}$2y$05$4eqBfkhKiDziTien.BlZh.e8ak9C.AQ1jApdQNaSj1rdmVnKQrOCO")
+        .roles("USER").build();
+    UserDetails 福安 = User.withUsername("福安")
+        .password("{bcrypt}$2y$05$FjBaXS65eKr.0NOYEHICnu0/LRa.vAaz58lJwFxWNDJC9q7tNn0Ui")
+        .roles("USER").build();
+    UserDetails 井垣 = User.withUsername("井垣")
+        .password("{bcrypt}$2y$05$7/DLePSJhtFbfwqjCeP5pO2kfTi8JkS5oHiItDx8l0pajJ.M5PzTu")
+        .roles("USER").build();
+    UserDetails Z2883 = User.withUsername("Z2883")
+        .password("{bcrypt}$2y$05$CRK/KECwHaLnHaXSBUMjkOCMHCKoj53d7UF7.Dn2x7kLKdtb4VS2S")
+        .roles("USER").build();
+    UserDetails Z3193 = User.withUsername("Z3193")
+        .password("{bcrypt}$2y$05$.7x70gfzrAlVixw0e8VtbusR5DkH3ZcSAbiWiZwqcwlHAmaEBJjV.")
+        .roles("USER").build();
+
+    return new InMemoryUserDetailsManager(kash, ken, shimo, akina, tsuna, Z2762, Z2789, Z2819, Z2911, Z2946, Z2974,
+        Z3052, Z3055, Z3065, Z3069, Z3182, Z4272, 本田, 福安, 井垣, Z2883, Z3193);
   }
 
   @Bean
