@@ -303,6 +303,10 @@
             stopElapsedTimer();
             stopBgm(); // ★ BGM 停止
             window.location.href = REDIRECT_URL;
+
+            // アニメーション完了時の遷移（複数問のため無効化）
+            // stopElapsedTimer();
+            // window.location.href = REDIRECT_URL;
           }
         }
         var rafId = requestAnimationFrame(step);
@@ -496,12 +500,14 @@
         mark.classList.remove('correct', 'wrong');
 
         if (data.correct) {
-          // 正解：大きな〇を表示 → 少し待って /ranking に移動
           mark.textContent = '〇';
           mark.classList.add('correct');
           overlay.classList.add('show');
+
+          var nextUrl = (data.redirectTo) ? String(data.redirectTo) : REDIRECT_URL;
+
           setTimeout(function () {
-            window.location.href = REDIRECT_URL;
+            window.location.href = nextUrl;
           }, 2000);
         } else {
           // 不正解：大きな✕を表示 → 2 秒後にオーバーレイだけ消し、そのまま滞在

@@ -1,6 +1,7 @@
 package team2.nats.controller;
 
-import java.util.concurrent.ThreadLocalRandom;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +27,14 @@ import team2.nats.service.ResultService;
 @Controller
 public class GameController {
 
+  // ★追加：個人進行用セッションキー
+  private static final String SESSION_QUESTION_INDEX = "questionIndex";
+  private static final String SESSION_QUESTION_START_MS = "questionStartMs";
+  private static final String SESSION_TOTAL_ELAPSED_MS = "totalElapsedMs";
+
+  // ★問題数（変えるならここ）
+  private static final int QUESTIONS_PER_GAME = 5;
+
   private final ImageRepository imageRepository;
   private final MessageService messageService;
   private final GameStatusService gameStatusService;
@@ -44,43 +53,69 @@ public class GameController {
     this.resultService = resultService;
   }
 
+  /** ★追加：共有の5問セットを未作成なら作る（重複なし） */
+  private void ensureSharedQuestionSetInitialized() {
+    if (currentQuestionService.hasQuestionSet())
+      return;
+
+    List<Image> imgs = imageRepository.findAll();
+    ArrayList<Long> ids = new ArrayList<>();
+    if (imgs != null) {
+      for (Image img : imgs) {
+        if (img != null && img.getId() != null)
+          ids.add(img.getId());
+      }
+    }
+
+    Collections.shuffle(ids);
+    int n = Math.min(QUESTIONS_PER_GAME, ids.size());
+    List<Long> picked = ids.subList(0, n);
+
+    currentQuestionService.setQuestionSet(picked);
+    currentQuestionService.setCurrentImageId(currentQuestionService.getQuestionImageIdAt(0));
+  }
+
   @GetMapping("/game")
-  public String game(
-      Model model,
-      HttpSession session,
+  public String game(Model model, HttpSession session,
       @RequestParam(value = "reset", required = false) Integer reset) {
 
     if (reset != null && reset.intValue() == 1) {
       session.removeAttribute("quizStart");
+      session.removeAttribute(SESSION_QUESTION_INDEX);
+      session.removeAttribute(SESSION_QUESTION_START_MS);
+      session.removeAttribute(SESSION_TOTAL_ELAPSED_MS);
     }
 
-    if (session.getAttribute("quizStart") == null) {
-      session.setAttribute("quizStart", System.currentTimeMillis());
+    // ★共有の出題順を確定（全員共通）
+    ensureSharedQuestionSetInitialized();
+
+    // ★個人進行の初期化
+    if (session.getAttribute(SESSION_QUESTION_INDEX) == null) {
+      session.setAttribute(SESSION_QUESTION_INDEX, 0);
     }
+    if (session.getAttribute(SESSION_TOTAL_ELAPSED_MS) == null) {
+      session.setAttribute(SESSION_TOTAL_ELAPSED_MS, 0L);
+    }
+
+    int idx = (Integer) session.getAttribute(SESSION_QUESTION_INDEX);
+
+    // ★この人が表示すべき問題（共有セット[idx]）
+    Long imageId = currentQuestionService.getQuestionImageIdAt(idx);
+    Image questionImage = null;
+    if (imageId != null) {
+      questionImage = imageRepository.findById(imageId).orElse(null);
+    }
+
+    // currentImageId は「現在の問題」として更新（共有は保ちつつ参照用）
+    currentQuestionService.setCurrentImageId(imageId);
+
+    // ★1問ごとの開始時刻（合計計測用）
+    long startMs = System.currentTimeMillis();
+    session.setAttribute(SESSION_QUESTION_START_MS, startMs);
+    session.setAttribute("quizStart", startMs); // 既存互換（残す）
 
     List<Image> imgs = imageRepository.findAll();
     model.addAttribute("images", imgs);
-
-    Image questionImage = null;
-
-    Long currentId = currentQuestionService.getCurrentImageId();
-    if (currentId != null) {
-      Optional<Image> byId = imageRepository.findById(currentId);
-      if (byId.isPresent()) {
-        questionImage = byId.get();
-      }
-    }
-
-    if (questionImage == null) {
-      if (imgs != null && !imgs.isEmpty()) {
-        questionImage = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
-      } else {
-        Optional<Image> fallback = imageRepository.findById(1L);
-        if (fallback.isPresent()) {
-          questionImage = fallback.get();
-        }
-      }
-    }
 
     String initialImage;
     if (questionImage != null) {
@@ -105,8 +140,7 @@ public class GameController {
 
   @PostMapping("/game/answer")
   @ResponseBody
-  public Map<String, Object> answer(@ModelAttribute("answerForm") AnswerForm form,
-      HttpSession session) {
+  public Map<String, Object> answer(@ModelAttribute("answerForm") AnswerForm form, HttpSession session) {
 
     Map<String, Object> response = new HashMap<>();
 
@@ -147,7 +181,6 @@ public class GameController {
 
     Image image = imageOpt.get();
     String answerKana = image.getAnswerKana();
-
     if (answerKana == null || answerKana.isBlank()) {
       response.put("success", false);
       response.put("error", "この画像の正解が未設定です");
@@ -156,36 +189,63 @@ public class GameController {
 
     boolean correct = normalized.equals(answerKana.trim());
 
-    messageService.saveMessage(content);
+    messageService.saveMessage(form.getContent());
 
-    if (correct) {
-      Object startObj = session.getAttribute("quizStart");
-      if (startObj instanceof Long) {
-        long startMs = (Long) startObj;
-        long nowMs = System.currentTimeMillis();
-        long elapsedMs = nowMs - startMs;
-        if (elapsedMs < 0)
-          elapsedMs = 0L;
+    if (!correct) {
+      response.put("success", true);
+      response.put("correct", false);
+      response.put("message", "不正解です");
+      return response;
+    }
 
-        String participant = "anonymous";
-        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-        if (auth != null && auth.getName() != null) {
-          participant = auth.getName();
-        }
+    // ★正解：この1問の時間を合計に加算
+    long nowMs = System.currentTimeMillis();
+    long qStartMs = (session.getAttribute(SESSION_QUESTION_START_MS) instanceof Long)
+        ? (Long) session.getAttribute(SESSION_QUESTION_START_MS)
+        : nowMs;
+    long elapsedMs = Math.max(0L, nowMs - qStartMs);
 
-        try {
-          resultService.saveResult(participant, elapsedMs, true);
-        } catch (Exception e) {
-          e.printStackTrace();
-        }
+    long totalMs = (session.getAttribute(SESSION_TOTAL_ELAPSED_MS) instanceof Long)
+        ? (Long) session.getAttribute(SESSION_TOTAL_ELAPSED_MS)
+        : 0L;
+    totalMs += elapsedMs;
+    session.setAttribute(SESSION_TOTAL_ELAPSED_MS, totalMs);
 
-        session.removeAttribute("quizStart");
-      }
+    int idx = (session.getAttribute(SESSION_QUESTION_INDEX) instanceof Integer)
+        ? (Integer) session.getAttribute(SESSION_QUESTION_INDEX)
+        : 0;
+    idx++;
+    session.setAttribute(SESSION_QUESTION_INDEX, idx);
+
+    int totalQuestions = Math.min(QUESTIONS_PER_GAME, currentQuestionService.getQuestionSetSize());
+
+    // ユーザ名
+    String participant = "anonymous";
+    Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+    if (auth != null && auth.getName() != null)
+      participant = auth.getName();
+
+    if (idx >= totalQuestions) {
+      // ★5問終わったので合計を1回保存してランキングへ
+      resultService.saveResult(participant, totalMs, true);
+
+      // 個人状態のみクリア（他人には影響しない）
+      session.removeAttribute("quizStart");
+      session.removeAttribute(SESSION_QUESTION_INDEX);
+      session.removeAttribute(SESSION_QUESTION_START_MS);
+      session.removeAttribute(SESSION_TOTAL_ELAPSED_MS);
+
+      response.put("success", true);
+      response.put("correct", true);
+      response.put("message", "正解です！");
+      response.put("redirectTo", "/ranking");
+      return response;
     }
 
     response.put("success", true);
-    response.put("correct", correct);
-    response.put("message", correct ? "正解です！" : "不正解です");
+    response.put("correct", true);
+    response.put("message", "正解です！");
+    response.put("redirectTo", "/game");
     return response;
   }
 
@@ -201,51 +261,19 @@ public class GameController {
     return true;
   }
 
-  public static class AnswerForm {
-    private Long imageId;
-    private String content;
-
-    public Long getImageId() {
-      return imageId;
-    }
-
-    public void setImageId(Long imageId) {
-      this.imageId = imageId;
-    }
-
-    public String getContent() {
-      return content;
-    }
-
-    public void setContent(String content) {
-      this.content = content;
-    }
-  }
-
   @PostMapping("/api/game/start")
   @ResponseBody
   public Map<String, Object> startGame() {
-    List<Image> imgs = imageRepository.findAll();
-    Long pickedId = null;
-    if (imgs != null && !imgs.isEmpty()) {
-      Image pick = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
-      pickedId = pick.getId();
-      currentQuestionService.setCurrentImageId(pickedId);
-    } else {
-      Optional<Image> fallback = imageRepository.findById(1L);
-      if (fallback.isPresent()) {
-        pickedId = fallback.get().getId();
-        currentQuestionService.setCurrentImageId(pickedId);
-      } else {
-        currentQuestionService.resetCurrentImageId();
-      }
+    // ★ガード：開始後の再押下で問題セットを作り直さない
+    if (!currentQuestionService.hasQuestionSet()) {
+      ensureSharedQuestionSetInitialized();
+      gameStatusService.startGame();
     }
-
-    gameStatusService.startGame();
 
     Map<String, Object> response = new HashMap<>();
     response.put("started", true);
-    response.put("imageId", pickedId);
+    response.put("imageId", currentQuestionService.getCurrentImageId());
+    response.put("ignored", currentQuestionService.hasQuestionSet()); // 参考情報
     return response;
   }
 
@@ -253,30 +281,20 @@ public class GameController {
   @ResponseBody
   public Map<String, Object> startCountdown(
       @RequestParam(value = "durationMillis", required = false) Long durationMillis) {
+
     long duration = (durationMillis == null) ? 3000L : durationMillis.longValue();
 
-    List<Image> imgs = imageRepository.findAll();
-    Long pickedId = null;
-    if (imgs != null && !imgs.isEmpty()) {
-      Image pick = imgs.get(ThreadLocalRandom.current().nextInt(imgs.size()));
-      pickedId = pick.getId();
-      currentQuestionService.setCurrentImageId(pickedId);
-    } else {
-      Optional<Image> fallback = imageRepository.findById(1L);
-      if (fallback.isPresent()) {
-        pickedId = fallback.get().getId();
-        currentQuestionService.setCurrentImageId(pickedId);
-      } else {
-        currentQuestionService.resetCurrentImageId();
-      }
+    // ★ガード：開始後の再押下で問題セットを作り直さない／再カウントダウンしない
+    if (!currentQuestionService.hasQuestionSet()) {
+      ensureSharedQuestionSetInitialized();
+      gameStatusService.startCountdown(duration);
     }
-
-    gameStatusService.startCountdown(duration);
 
     Map<String, Object> response = new HashMap<>();
     response.put("countdownMillis", duration);
-    response.put("imageId", pickedId);
+    response.put("imageId", currentQuestionService.getCurrentImageId());
     response.put("started", false);
+    response.put("ignored", currentQuestionService.hasQuestionSet()); // 参考情報
     return response;
   }
 
@@ -298,13 +316,15 @@ public class GameController {
   @ResponseBody
   public Map<String, Object> resetGame(HttpSession session) {
     session.removeAttribute("quizStart");
-    currentQuestionService.resetCurrentImageId();
+    session.removeAttribute(SESSION_QUESTION_INDEX);
+    session.removeAttribute(SESSION_QUESTION_START_MS);
+    session.removeAttribute(SESSION_TOTAL_ELAPSED_MS);
+
+    // ★共有もリセット（次のゲームで別の5問セット）
+    currentQuestionService.resetAll();
     gameStatusService.resetGame();
 
-    // ★追加：ランキング（results）もリセット
     resultService.resetRankings();
-
-    // ★全員へ通知（2秒間 true）
     gameStatusService.requestReset();
 
     Map<String, Object> response = new HashMap<>();
@@ -316,5 +336,26 @@ public class GameController {
   @ResponseBody
   public List<RankingDto> rankings() {
     return resultService.getRankings();
+  }
+
+  public static class AnswerForm {
+    private Long imageId;
+    private String content;
+
+    public Long getImageId() {
+      return imageId;
+    }
+
+    public void setImageId(Long imageId) {
+      this.imageId = imageId;
+    }
+
+    public String getContent() {
+      return content;
+    }
+
+    public void setContent(String content) {
+      this.content = content;
+    }
   }
 }
