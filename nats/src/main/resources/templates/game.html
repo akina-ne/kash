@@ -157,7 +157,12 @@
     }
 
     .judge-mark.wrong {
-      color: #cc0000;
+      color: red;
+    }
+
+    /* ラベルを赤にする（ひらがな入力案内） */
+    label[for="content"] {
+      color: red;
     }
   </style>
 </head>
@@ -190,7 +195,7 @@
 
         <h2>回答フォーム</h2>
         <!-- ★ ラベルをひらがな前提に変更 -->
-        <label for="content">回答（ひらがなで入力してください）</label><br />
+        <label for="content">ひらがなで入力してね！<br />enterキーで送信できます♡</label><br />
         <textarea id="content" th:field="*{content}" rows="12" cols="40" maxlength="1000" required></textarea>
         <div style="margin-top:8px;"><button type="submit" class="submit-button">送信</button></div>
 
