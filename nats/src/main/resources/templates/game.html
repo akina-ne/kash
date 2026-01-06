@@ -302,9 +302,9 @@
             // タイマを停止してからリダイレクト
             //stopBgm(); // ★ BGM 停止
 
-            // アニメーション完了時の遷移（複数問のため無効化）
-            // stopElapsedTimer();
-            // window.location.href = REDIRECT_URL;
+            // アニメーション完了時：タイムアップとして不正解扱いで次の問題へ
+            stopElapsedTimer();       // 経過時間計測を止める
+            submitTimeoutAnswer();    // サーバに「タイムアップ回答」を送信
           }
         }
         var rafId = requestAnimationFrame(step);
@@ -470,6 +470,44 @@
       playBgm('Demo2.mp3');
     });
 
+    // ★ タイムアップ時の自動回答送信（不正解扱いで次の問題へ）
+    function submitTimeoutAnswer() {
+      var form = document.getElementById('answerForm');
+      if (!form) {
+        // フォームが無ければ何もできないので終了
+        return;
+      }
+
+      // imageId は hidden から取得
+      var imageIdInput = form.querySelector('input[name="imageId"]');
+      var imageId = imageIdInput ? imageIdInput.value : null;
+
+      // CSRF トークンもフォームから取得
+      var csrfInput = form.querySelector('input[name="_csrf"]');
+      var csrfToken = csrfInput ? csrfInput.value : null;
+
+      var formData = new FormData();
+      formData.append('imageId', imageId || '');
+      // タイムアップであることが分かるよう、特別な値を送る（サーバ側で判定する）
+      formData.append('content', '__TIMEUP__');
+
+      fetch(form.getAttribute('action'), {
+        method: 'POST',
+        headers: csrfToken ? { 'X-CSRF-TOKEN': csrfToken } : {},
+        body: formData
+      })
+        .then(function (res) { return res.json(); })
+        .then(function (data) {
+          // 〇✕オーバーレイ表示など既存ロジックに任せる
+          handleAnswerResponse(data);
+        })
+        .catch(function (err) {
+          console.error('タイムアップ送信エラー', err);
+          // 通信エラー時はとりあえずランキングに飛ばしておくなど、必要ならフォールバックを書く
+          window.location.href = REDIRECT_URL;
+        });
+    }
+
     // ★ サーバ応答に応じて 〇 / ✕ を表示する
     function handleAnswerResponse(data) {
       if (!data) {
@@ -508,13 +546,23 @@
             window.location.href = nextUrl;
           }, 2000);
         } else {
-          // 不正解：大きな✕を表示 → 2 秒後にオーバーレイだけ消し、そのまま滞在
+          // 不正解：通常不正解かタイムアップ不正解かで挙動を分ける
           mark.textContent = '✕';
           mark.classList.add('wrong');
           overlay.classList.add('show');
-          setTimeout(function () {
-            overlay.classList.remove('show');
-          }, 2000);
+
+          // ★ data.timeout === true のときだけ、次の問題（redirectTo）へ
+          if (data.timeout) {
+            var nextUrl = (data.redirectTo) ? String(data.redirectTo) : REDIRECT_URL;
+            setTimeout(function () {
+              window.location.href = nextUrl;
+            }, 2000);
+          } else {
+            // 通常の不正解はその場に滞在：2秒後にオーバーレイだけ消す
+            setTimeout(function () {
+              overlay.classList.remove('show');
+            }, 2000);
+          }
         }
       }
     }
