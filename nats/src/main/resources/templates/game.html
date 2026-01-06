@@ -443,6 +443,9 @@
       // Enterキーで送信（通常の改行は不要、Enterで1ワード送信する想定）
       var textarea = document.getElementById('content');
       if (textarea && form) {
+        // ★ ページ表示直後にフォームへフォーカス
+        textarea.focus();
+
         textarea.addEventListener('keydown', function (e) {
           // Enter 押下で送信（Shift/Alt/Ctrl 等複合キーは無視して Enter 単独のみ）
           if (e.key === 'Enter' && !e.shiftKey && !e.ctrlKey && !e.altKey && !e.metaKey) {
