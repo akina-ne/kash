@@ -9,6 +9,22 @@
     body {
       font-family: sans-serif;
       margin: 1rem;
+
+      /* ★追加：ロビー背景 */
+      background-image: url('/images/game-bg.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+
+    /* ★読みやすさ確保（必要なら） */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.65);
+      z-index: -1;
     }
 
     h1 {
@@ -96,7 +112,7 @@
 </head>
 
 <body>
-  <h1>入室者（入った順）</h1>
+  <h1>画像の森</h1>
   <!-- 追加: 画像表示ページへ移動するボタン -->
   <button class="show-images-button" id="openImagesBtn">開始</button>
   <div id="count" class="count"></div>

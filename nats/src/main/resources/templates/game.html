@@ -80,8 +80,8 @@
       order: 2;
       padding: 20px;
       box-sizing: border-box;
+      background: rgba(255, 255, 255, 0.3);
       overflow: auto;
-      background: #fff;
     }
 
     /* 画像領域（右） */
@@ -95,7 +95,7 @@
       justify-content: center;
       padding: 20px;
       box-sizing: border-box;
-      background: #ffffff;
+      background: transparent !important;
       position: relative;
       overflow: hidden;
     }
@@ -164,6 +164,24 @@
     label[for="content"] {
       color: red;
     }
+
+    body {
+      /* ★追加：ゲーム背景（別画像） */
+      background-image: url('/images/game-bg.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+
+    /* ★読みやすさ確保（必要なら） */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.30);
+      z-index: -1;
+    }
   </style>
 </head>
 
@@ -172,7 +190,7 @@
   <div id="elapsedTime"
     style="position:fixed;top:10px;left:50%;transform:translateX(-50%);background:#fff;padding:6px 10px;border-radius:6px;box-shadow:0 2px 6px rgba(0,0,0,0.15);z-index:1000;font-weight:600;">
     経過: 0秒</div>
-  <h1>Game</h1>
+  <h1>画像の森</h1>
 
   <!-- 〇/✕ オーバーレイ -->
   <div id="judgeOverlay" class="judge-overlay">
