@@ -22,6 +22,78 @@
       background: #f2f2f2;
     }
 
+    /* ★テーブル(ランキング)が背景色ベタになるのを改善：半透明にして背景画像が見えるようにする */
+    table {
+      background: rgba(255, 255, 255, 0.55);
+      backdrop-filter: blur(4px);
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    th {
+      background: rgba(255, 255, 255, 0.75);
+    }
+
+    td {
+      background: transparent;
+      /* セル単位の白塗りを避ける */
+    }
+
+    /* ★自分の行をよりはっきり（太枠＋強めの背景＋影） */
+    tr.me {
+      outline: 4px solid rgba(45, 124, 255, 0.95);
+      outline-offset: -2px;
+      background: linear-gradient(90deg,
+          rgba(45, 124, 255, 0.38),
+          rgba(45, 124, 255, 0.16),
+          rgba(45, 124, 255, 0.38));
+      box-shadow: 0 10px 28px rgba(45, 124, 255, 0.28);
+    }
+
+    tr.me td {
+      font-weight: 800;
+    }
+
+    /* ★順位バッジのベース（少し大きめに） */
+    .rank-badge {
+      font-weight: 900;
+      font-size: 18px;
+      letter-spacing: 0.5px;
+    }
+
+    /* ★金：グラデ＋発光 */
+    .rank-gold {
+      background: linear-gradient(180deg, #fff3a1 0%, #ffd24a 35%, #b8860b 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow:
+        0 0 6px rgba(255, 210, 74, 0.75),
+        0 0 14px rgba(255, 210, 74, 0.45);
+    }
+
+    /* ★銀：金属っぽいグラデ */
+    .rank-silver {
+      background: linear-gradient(180deg, #ffffff 0%, #dfe3e8 45%, #8f9aa6 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow:
+        0 0 6px rgba(223, 227, 232, 0.75),
+        0 0 14px rgba(143, 154, 166, 0.35);
+    }
+
+    /* ★銅：赤み＋光沢 */
+    .rank-bronze {
+      background: linear-gradient(180deg, #ffd2b0 0%, #c67a3a 45%, #7a3f1a 100%);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+      text-shadow:
+        0 0 6px rgba(198, 122, 58, 0.65),
+        0 0 14px rgba(122, 63, 26, 0.35);
+    }
+
     .show-images-button {
       display: block;
       margin: 16px auto 0 auto;
@@ -98,19 +170,53 @@
     var POLL_RANKING_MS = 1000;
     var REDIRECT_LOBBY_URL = '/';
 
-    function renderRankings(rows) {
+    async function fetchCurrentUser() {
+      try {
+        var r = await fetch('/api/online');
+        var data = await r.json();
+        return data ? data.currentUser : null;
+      } catch (e) {
+        console.error('online fetch failed (for highlight)', e);
+        return null;
+      }
+    }
+
+    function createRankSpan(rankNumber) {
+      var sp = document.createElement('span');
+      sp.className = 'rank-badge';
+
+      if (rankNumber === 1) sp.classList.add('rank-gold');
+      else if (rankNumber === 2) sp.classList.add('rank-silver');
+      else if (rankNumber === 3) sp.classList.add('rank-bronze');
+
+      sp.textContent = String(rankNumber);
+      return sp;
+    }
+
+    async function renderRankings(rows) {
       var tbody = document.getElementById('rankingBody');
       if (!tbody) return;
+
+      var currentUser = await fetchCurrentUser();
 
       tbody.innerHTML = '';
       (rows || []).forEach(function (row, idx) {
         var tr = document.createElement('tr');
 
+        var rankNo = idx + 1;
+
         var tdRank = document.createElement('td');
-        tdRank.textContent = String(idx + 1);
+        // ★1〜3位は色付きの数字
+        tdRank.appendChild(createRankSpan(rankNo));
 
         var tdName = document.createElement('td');
-        tdName.textContent = row && row.name != null ? String(row.name) : '-';
+        var name = (row && row.name != null) ? String(row.name) : '-';
+        tdName.textContent = name;
+
+        // ★自分の行ハイライト
+        if (currentUser && name === currentUser) {
+          tr.classList.add('me');
+        }
 
         var tdTime = document.createElement('td');
         var ms = row && row.bestTimeMs != null ? Number(row.bestTimeMs) : null;
@@ -181,7 +287,8 @@
         fetch('/api/rankings')
           .then(function (res) { return res.json(); })
           .then(function (rows) {
-            renderRankings(rows);
+            // ★renderRankings が async になったので await する
+            return renderRankings(rows);
           })
           .catch(function (err) {
             console.error('rankings fetch failed', err);
