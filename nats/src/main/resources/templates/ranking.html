@@ -50,6 +50,23 @@
       margin-top: 8px;
       font-size: 14px;
     }
+
+    body {
+      background-image: url('/images/game-bg.png');
+      background-size: cover;
+      background-position: center;
+      background-repeat: no-repeat;
+      background-attachment: fixed;
+    }
+
+    /* 文字が読みにくい場合だけ薄い膜（濃さは調整OK） */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: rgba(255, 255, 255, 0.30);
+      z-index: -1;
+    }
   </style>
 </head>
 
