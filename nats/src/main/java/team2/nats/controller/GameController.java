@@ -145,24 +145,27 @@ public class GameController {
     Map<String, Object> response = new HashMap<>();
 
     String content = form.getContent();
+    boolean timeout = "__TIMEUP__".equals(content); // ★ タイムアップ特別値かどうか
 
-    if (content == null || content.trim().isEmpty()) {
-      response.put("success", false);
-      response.put("error", "回答を入力してください（ひらがな）");
-      return response;
-    }
-    if (content.length() > 1000) {
-      response.put("success", false);
-      response.put("error", "回答は1000文字以内で入力してください");
-      return response;
-    }
+    // ★タイムアップ以外のときだけ入力バリデーションを行う
+    if (!timeout) {
+      if (content == null || content.trim().isEmpty()) {
+        response.put("success", false);
+        response.put("error", "回答を入力してください（ひらがな）");
+        return response;
+      }
+      if (content.length() > 1000) {
+        response.put("success", false);
+        response.put("error", "回答は1000文字以内で入力してください");
+        return response;
+      }
 
-    String normalized = content.trim();
-
-    if (!isHiraganaOnly(normalized)) {
-      response.put("success", false);
-      response.put("error", "ひらがなのみで入力してください");
-      return response;
+      String normalized = content.trim();
+      if (!isHiraganaOnly(normalized)) {
+        response.put("success", false);
+        response.put("error", "ひらがなのみで入力してください");
+        return response;
+      }
     }
 
     Long imageId = form.getImageId();
@@ -187,18 +190,19 @@ public class GameController {
       return response;
     }
 
-    boolean correct = normalized.equals(answerKana.trim());
-
-    messageService.saveMessage(form.getContent());
-
-    if (!correct) {
-      response.put("success", true);
-      response.put("correct", false);
-      response.put("message", "不正解です");
-      return response;
+    boolean correct;
+    if (timeout) {
+      // タイムアップは常に不正解扱い
+      correct = false;
+    } else {
+      String normalized = content.trim();
+      correct = normalized.equals(answerKana.trim());
+      // 通常回答のみメッセージ保存
+      messageService.saveMessage(form.getContent());
     }
 
-    // ★正解：この1問の時間を合計に加算
+    // ★ここから「時間計測＆インデックス更新」
+
     long nowMs = System.currentTimeMillis();
     long qStartMs = (session.getAttribute(SESSION_QUESTION_START_MS) instanceof Long)
         ? (Long) session.getAttribute(SESSION_QUESTION_START_MS)
@@ -208,44 +212,71 @@ public class GameController {
     long totalMs = (session.getAttribute(SESSION_TOTAL_ELAPSED_MS) instanceof Long)
         ? (Long) session.getAttribute(SESSION_TOTAL_ELAPSED_MS)
         : 0L;
-    totalMs += elapsedMs;
-    session.setAttribute(SESSION_TOTAL_ELAPSED_MS, totalMs);
 
     int idx = (session.getAttribute(SESSION_QUESTION_INDEX) instanceof Integer)
         ? (Integer) session.getAttribute(SESSION_QUESTION_INDEX)
         : 0;
-    idx++;
-    session.setAttribute(SESSION_QUESTION_INDEX, idx);
+
+    // ★★★ ここが重要 ★★★
+    // ・正解 or タイムアップのときだけ「1問終わり」として時間加算＆インデックスを進める
+    // ・通常不正解（timeout=false && correct=false）のときは何も進めない
+    if (correct || timeout) {
+      totalMs += elapsedMs;
+      session.setAttribute(SESSION_TOTAL_ELAPSED_MS, totalMs);
+
+      idx++;
+      session.setAttribute(SESSION_QUESTION_INDEX, idx);
+    }
 
     int totalQuestions = Math.min(QUESTIONS_PER_GAME, currentQuestionService.getQuestionSetSize());
 
-    // ユーザ名
+    // ユーザ名取得
     String participant = "anonymous";
     Authentication auth = SecurityContextHolder.getContext().getAuthentication();
-    if (auth != null && auth.getName() != null)
+    if (auth != null && auth.getName() != null) {
       participant = auth.getName();
+    }
 
+    // ★ゲーム終了判定も「インデックスを進めた場合のみ」効くことになる
     if (idx >= totalQuestions) {
-      // ★5問終わったので合計を1回保存してランキングへ
+      // ゲーム終了：合計時間を登録（全問に到達したときのみ）
       resultService.saveResult(participant, totalMs, true);
 
-      // 個人状態のみクリア（他人には影響しない）
+      // 個人状態をクリア
       session.removeAttribute("quizStart");
       session.removeAttribute(SESSION_QUESTION_INDEX);
       session.removeAttribute(SESSION_QUESTION_START_MS);
       session.removeAttribute(SESSION_TOTAL_ELAPSED_MS);
 
       response.put("success", true);
-      response.put("correct", true);
-      response.put("message", "正解です！");
+      response.put("correct", correct);
+      // メッセージは正解/タイムアップで適宜
+      if (correct) {
+        response.put("message", "正解です！");
+      } else if (timeout) {
+        response.put("message", "タイムアップ（不正解）です");
+      } else {
+        response.put("message", "不正解です");
+      }
       response.put("redirectTo", "/ranking");
+      response.put("timeout", timeout);
       return response;
     }
 
+    // ★まだ問題が残っている場合
     response.put("success", true);
-    response.put("correct", true);
-    response.put("message", "正解です！");
+    response.put("correct", correct);
+    if (correct) {
+      response.put("message", "正解です！");
+    } else if (timeout) {
+      response.put("message", "タイムアップ（不正解）です");
+    } else {
+      response.put("message", "不正解です");
+    }
+
+    // 正解 or タイムアップの場合のみ front 側が /game へ遷移する想定
     response.put("redirectTo", "/game");
+    response.put("timeout", timeout);
     return response;
   }
 
