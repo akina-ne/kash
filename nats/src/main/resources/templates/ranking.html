@@ -289,6 +289,7 @@
           .then(function (rows) {
             // ★renderRankings が async になったので await する
             return renderRankings(rows);
+
           })
           .catch(function (err) {
             console.error('rankings fetch failed', err);
