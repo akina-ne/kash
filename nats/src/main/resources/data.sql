@@ -51,7 +51,7 @@ INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, an
 VALUES ('araiguma.jpg', '/images/araiguma.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'あらいぐま');
 
 INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
-VALUES ('firenchikuru-ra-.jpg', '/images/firenchikuru.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'ふれんちくるーらー');
+VALUES ('firenchikuru-ra-.jpg', '/images/firenchikuru-ra-.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'ふれんちくるーらー');
 INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
 VALUES ('goryoukaku.jpg', '/images/goryoukaku.jpg', 'kash', 'image/jpeg', CURRENT_TIMESTAMP, 'ごりょうかく');
 INSERT INTO images (file_name, file_path, owner_id, content_type, created_at, answer_kana)
